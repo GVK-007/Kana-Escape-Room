@@ -77,13 +77,19 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const s = stateRef.current;
 
       // Player input
-      if (s.keys.up) s.playerY = Math.max(4, s.playerY - 4.2);
-      if (s.keys.down) s.playerY = Math.min(200 - s.paddleH - 4, s.playerY + 4.2);
+      if (s.keys.up) s.playerY = Math.max(4, s.playerY - 4.2 * dt);
+      if (s.keys.down) s.playerY = Math.min(200 - s.paddleH - 4, s.playerY + 4.2 * dt);
 
       // Humanized AI movement: only actively tracks when ball is traveling toward AI
       let targetAiY: number;
@@ -94,7 +100,7 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
         targetAiY = 100 - s.paddleH / 2;
       }
 
-      const aiSpeed = 2.6;
+      const aiSpeed = 2.6 * dt;
       if (s.aiY < targetAiY - 2) {
         s.aiY = Math.min(200 - s.paddleH - 4, s.aiY + aiSpeed);
       } else if (s.aiY > targetAiY + 2) {
@@ -102,8 +108,8 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
       }
 
       if (!s.won && !s.gameOver) {
-        s.ballX += s.ballVx;
-        s.ballY += s.ballVy;
+        s.ballX += s.ballVx * dt;
+        s.ballY += s.ballVy * dt;
 
         // Top/Bottom walls
         if (s.ballY <= 4) {

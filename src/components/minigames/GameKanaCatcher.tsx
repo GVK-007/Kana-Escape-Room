@@ -52,18 +52,24 @@ export const GameKanaCatcher: React.FC<GameKanaCatcherProps> = ({ onSuccess, tar
 
     let animId: number;
     let spawnTimer = 0;
+    let lastTime = performance.now();
     const colors = ['#f472b6', '#38bdf8', '#fbbf24', '#a78bfa', '#34d399'];
     const kanaSymbols = ['あ', 'い', 'う', 'え', 'お'];
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const state = stateRef.current;
 
       // Input movement: smooth, steady 4.5 px/frame
-      if (state.keys.left) state.basketX = Math.max(8, state.basketX - 4.5);
-      if (state.keys.right) state.basketX = Math.min(200, state.basketX + 4.5);
+      if (state.keys.left) state.basketX = Math.max(8, state.basketX - 4.5 * dt);
+      if (state.keys.right) state.basketX = Math.min(200, state.basketX + 4.5 * dt);
 
       // Spawn falling spirit wisps
-      spawnTimer++;
+      spawnTimer += dt;
       const intervalThreshold = Math.max(30, 52 - state.caught * 1.1);
 
       if (spawnTimer > intervalThreshold && !state.won && !state.gameOver) {
@@ -85,7 +91,7 @@ export const GameKanaCatcher: React.FC<GameKanaCatcherProps> = ({ onSuccess, tar
       if (!state.won && !state.gameOver) {
         for (let i = state.items.length - 1; i >= 0; i--) {
           const item = state.items[i];
-          item.y += item.speed;
+          item.y += item.speed * dt;
 
           // Check Catch (longer basin: width 54)
           if (

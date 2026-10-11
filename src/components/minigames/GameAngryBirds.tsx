@@ -141,9 +141,15 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
     const gravity = 0.22;
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const s = stateRef.current;
       const p = s.projectile;
 
@@ -178,8 +184,8 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
         }
 
         if (b.alive && b.falling) {
-          b.vy += 0.24;
-          b.y += b.vy;
+          b.vy += 0.24 * dt;
+          b.y += b.vy * dt;
           if (b.y >= 175 - b.h) {
             b.y = 175 - b.h;
             b.vy = 0;
@@ -212,8 +218,8 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
           }
         }
         if (t.alive && t.falling) {
-          t.vy += 0.24;
-          t.y += t.vy;
+          t.vy += 0.24 * dt;
+          t.y += t.vy * dt;
           if (t.y >= 175 - t.r) {
             t.y = 175 - t.r;
             t.vy = 0;
@@ -223,9 +229,9 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
 
       // Update projectile physics
       if (p.active) {
-        p.vy += gravity;
-        p.x += p.vx;
-        p.y += p.vy;
+        p.vy += gravity * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
 
         // Check target collision
         for (const t of s.targets) {

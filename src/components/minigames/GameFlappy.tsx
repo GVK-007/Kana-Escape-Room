@@ -88,17 +88,23 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
     const gravity = 0.22;
     const gap = 68;
     const pipeWidth = 24;
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const state = stateRef.current;
 
       // Update physics if active
       if (state.started && !state.gameOver && !state.won) {
-        state.velocity += gravity;
-        state.birdY += state.velocity;
+        state.velocity += gravity * dt;
+        state.birdY += state.velocity * dt;
 
         // Ground collision (y > 184)
         if (state.birdY > 184) {
@@ -116,7 +122,7 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
         // Update Pipes
         for (let i = 0; i < state.pipes.length; i++) {
           const p = state.pipes[i];
-          p.x -= 1.5;
+          p.x -= 1.5 * dt;
 
           // Check pass
           if (!p.passed && p.x + pipeWidth < 45) {

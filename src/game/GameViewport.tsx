@@ -23,6 +23,7 @@ interface GameViewportProps {
   isDoorUnlocked: boolean;
   completedMinigames: string[];
   isLocked?: boolean;
+  isFrozen?: boolean;
   onInteract: (obj: InteractableObject) => void;
   onInteractDoor: () => void;
   onReturnToPrevRoom?: () => void;
@@ -45,6 +46,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
   isDoorUnlocked,
   completedMinigames,
   isLocked = false,
+  isFrozen = false,
   onInteract,
   onInteractDoor,
   onReturnToPrevRoom,
@@ -423,8 +425,8 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
   // Main Render & Game Loop
   useEffect(() => {
-    if (isLocked) {
-      // Free 100% of browser rendering threads when minigame or pause menu is active!
+    if (isFrozen) {
+      // Completely freeze background game loop while loading or in modals/minigames
       return;
     }
 
@@ -435,8 +437,15 @@ export const GameViewport: React.FC<GameViewportProps> = ({
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
 
-    const gameLoop = () => {
+    const gameLoop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      // Normalized delta time: 1.0 at 60 FPS, 0.5 at 120 FPS, 0.67 at 90 FPS
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const player = playerRef.current;
       const keys = keysRef.current;
 
@@ -481,7 +490,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       player.moving = isMoving;
 
       if (player.bumpCooldown > 0) {
-        player.bumpCooldown -= 1;
+        player.bumpCooldown -= dt;
       }
 
       if (isMoving) {
@@ -507,7 +516,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
         // Step cadence: subtle shift between push-off (frames 0, 2) and plant (frames 1, 3)
         const stepPulse = player.frame % 2 === 0 ? 1.10 : 0.90;
-        const currentSpeed = PLAYER_SPEED * Math.min(mag, 1.0) * stepPulse;
+        const currentSpeed = PLAYER_SPEED * Math.min(mag, 1.0) * stepPulse * dt;
 
         // Apply movement with axis slide
         const nextX = player.x + (dx / mag) * currentSpeed;
@@ -541,7 +550,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
         // Only animate stride if character actually displaced
         if (movedX || movedY) {
-          player.animTimer += 1;
+          player.animTimer += dt;
           if (player.animTimer >= 7) {
             player.animTimer = 0;
             const nextStep = (player.frame + 1) % 4;
@@ -560,7 +569,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         }
       } else {
         // Idle breathing bob
-        player.animTimer += 1;
+        player.animTimer += dt;
         if (player.animTimer > 25) {
           player.animTimer = 0;
           player.frame = (player.frame + 1) % 2;
@@ -632,7 +641,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       }
 
       // Update atmospheric particle simulation
-      atmosphereRef.current.update();
+      atmosphereRef.current.update(dt);
 
       // Update tap ripple animation
       if (tapRippleRef.current) {
@@ -827,11 +836,17 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
       // 4. Tap-to-Move floor indicator ripple
       if (tapRippleRef.current) {
-        ctx.strokeStyle = `rgba(250, 204, 21, ${tapRippleRef.current.alpha})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(tapRippleRef.current.x, tapRippleRef.current.y, tapRippleRef.current.radius, 0, Math.PI * 2);
-        ctx.stroke();
+        tapRippleRef.current.radius += 0.8 * dt;
+        tapRippleRef.current.alpha -= 0.04 * dt;
+        if (tapRippleRef.current.alpha <= 0) {
+          tapRippleRef.current = null;
+        } else {
+          ctx.strokeStyle = `rgba(250, 204, 21, ${tapRippleRef.current.alpha})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(tapRippleRef.current.x, tapRippleRef.current.y, tapRippleRef.current.radius, 0, Math.PI * 2);
+          ctx.stroke();
+        }
       }
 
       // 5. Foreground Atmospheric Particles
@@ -875,6 +890,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
     isDoorUnlocked,
     completedMinigames,
     isLocked,
+    isFrozen,
     debugMode,
     isSolid,
     device.scale,

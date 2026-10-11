@@ -139,16 +139,16 @@ export class AtmosphericSystem {
     }
   }
 
-  public update() {
-    this.tick += 1;
+  public update(dt: number = 1.0) {
+    this.tick += dt;
 
     for (const p of this.particles) {
-      p.phase += p.phaseSpeed;
+      p.phase += p.phaseSpeed * dt;
 
       // Update positions with organic sine wave flutter
       if (p.type === 'sakura') {
-        p.x += p.vx + Math.sin(p.phase) * (p.swayAmp || 0.6);
-        p.y += p.vy;
+        p.x += (p.vx + Math.sin(p.phase) * (p.swayAmp || 0.6)) * dt;
+        p.y += p.vy * dt;
         p.alpha = p.baseAlpha * (0.7 + Math.sin(p.phase * 0.8) * 0.3);
 
         // Wrap around room bounds
@@ -160,8 +160,8 @@ export class AtmosphericSystem {
           p.x = -4;
         }
       } else if (p.type === 'leaf') {
-        p.x += p.vx + Math.sin(p.phase * 1.3) * (p.swayAmp || 0.5);
-        p.y += p.vy;
+        p.x += (p.vx + Math.sin(p.phase * 1.3) * (p.swayAmp || 0.5)) * dt;
+        p.y += p.vy * dt;
         p.alpha = p.baseAlpha * (0.7 + Math.sin(p.phase) * 0.3);
 
         if (p.y > this.heightPx + 4) {
@@ -170,8 +170,8 @@ export class AtmosphericSystem {
         }
         if (p.x > this.widthPx + 4) p.x = -4;
       } else if (p.type === 'ember') {
-        p.x += p.vx + Math.sin(p.phase * 1.5) * 0.3;
-        p.y += p.vy;
+        p.x += (p.vx + Math.sin(p.phase * 1.5) * 0.3) * dt;
+        p.y += p.vy * dt;
         p.alpha = p.baseAlpha * (0.6 + Math.sin(p.phase * 2) * 0.4);
 
         if (p.y < -4) {
@@ -179,8 +179,8 @@ export class AtmosphericSystem {
           p.x = Math.random() * this.widthPx;
         }
       } else if (p.type === 'cyber_scan') {
-        p.x += p.vx + Math.sin(p.phase * 2) * 0.15;
-        p.y += p.vy;
+        p.x += (p.vx + Math.sin(p.phase * 2) * 0.15) * dt;
+        p.y += p.vy * dt;
         p.alpha = p.baseAlpha * (0.5 + Math.sin(p.phase * 3) * 0.5);
 
         if (p.y < -4) {
@@ -191,8 +191,8 @@ export class AtmosphericSystem {
         if (p.x > this.widthPx + 4) p.x = -2;
       } else {
         // Floating dust mote
-        p.x += p.vx + Math.cos(p.phase) * 0.12;
-        p.y += p.vy;
+        p.x += (p.vx + Math.cos(p.phase) * 0.12) * dt;
+        p.y += p.vy * dt;
         p.alpha = p.baseAlpha * (0.5 + Math.sin(p.phase) * 0.5);
 
         // Wrap around

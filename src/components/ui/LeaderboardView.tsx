@@ -10,6 +10,8 @@ import {
   deleteLeaderboardRunAsync,
   resetGlobalLeaderboardAsync,
   DEFAULT_ADMIN_KEY,
+  getLastPlayerRunId,
+  getMyRunIds,
 } from '../../utils/leaderboard';
 import { RunDetailsModal } from './RunDetailsModal';
 import { sounds } from '../../utils/audio';
@@ -154,6 +156,32 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     return sortLeaderboard(entries, category);
   }, [entries, category]);
 
+  // Identify active user run (either passed via highlightId or best/last run recorded on this device)
+  const userRunId = useMemo(() => {
+    if (highlightId && sortedEntries.some((e) => e.id === highlightId)) {
+      return highlightId;
+    }
+    const myIds = new Set(getMyRunIds());
+    const lastId = getLastPlayerRunId();
+    if (lastId) myIds.add(lastId);
+
+    if (myIds.size === 0) return null;
+
+    // Find the best-ranked run for this user in current category
+    const bestUserEntry = sortedEntries.find((e) => myIds.has(e.id));
+    return bestUserEntry ? bestUserEntry.id : null;
+  }, [highlightId, sortedEntries]);
+
+  const userRankIndex = userRunId ? sortedEntries.findIndex((e) => e.id === userRunId) : -1;
+  const userRank = userRankIndex >= 0 ? userRankIndex + 1 : null;
+  const userEntry = userRankIndex >= 0 ? sortedEntries[userRankIndex] : null;
+  const isUserInTop50 = userRank !== null && userRank <= 50;
+
+  // Leaderboard shows up to top 50 at a time
+  const top50Entries = useMemo(() => {
+    return sortedEntries.slice(0, 50);
+  }, [sortedEntries]);
+
   return (
     <div className="w-full flex flex-col items-center">
       {/* Category Tabs: Shortest Time vs Most Artifacts */}
@@ -189,24 +217,40 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         </button>
       </div>
 
-      {/* Category Criteria & Info */}
+      {/* Category Criteria & Info + User Rank Status */}
       <div className="w-full flex items-center justify-between mb-2 px-1 text-[8px] sm:text-[9px] font-pixel text-slate-400">
         <span className="text-yellow-400/90 flex items-center gap-1">
           {category === 'time' ? (
             <>
               <span className="text-yellow-300">⚡</span>
-              <span>FASTEST ESCAPES — Ranked by shortest completion time</span>
+              <span>FASTEST ESCAPES (TOP 50)</span>
             </>
           ) : (
             <>
               <span className="text-amber-300">🏺</span>
-              <span>MASTER COLLECTORS — Ranked by most word artifacts discovered</span>
+              <span>MASTER COLLECTORS (TOP 50)</span>
             </>
           )}
         </span>
-        <span className="text-slate-500 font-mono">
-          {sortedEntries.length} RUN{sortedEntries.length === 1 ? '' : 'S'}
-        </span>
+        <div className="flex items-center gap-2">
+          {userRank !== null ? (
+            <span
+              className={`px-1.5 py-0.5 rounded-xs font-bold border flex items-center gap-1 shadow-sm ${
+                isUserInTop50
+                  ? 'bg-amber-500/25 border-yellow-400 text-yellow-300 shadow-[0_0_8px_rgba(250,204,21,0.25)]'
+                  : 'bg-cyan-950/80 border-cyan-500 text-cyan-300'
+              }`}
+            >
+              <span>{isUserInTop50 ? '👑' : '📍'}</span>
+              <span>YOUR RANK: #{userRank}</span>
+            </span>
+          ) : (
+            <span className="text-slate-500">YOUR RANK: --</span>
+          )}
+          <span className="text-slate-500 font-mono">
+            {sortedEntries.length} RUN{sortedEntries.length === 1 ? '' : 'S'}
+          </span>
+        </div>
       </div>
 
       {/* Live Cloud Status Header & Admin Toggle */}
@@ -292,9 +336,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           </span>
         </div>
 
-        {/* Entries List */}
+        {/* Entries List (Top 50) */}
         <div className="max-h-60 sm:max-h-68 overflow-y-auto divide-y divide-slate-900/80 font-pixel">
-          {sortedEntries.length === 0 ? (
+          {top50Entries.length === 0 ? (
             <div className="p-8 text-center flex flex-col items-center gap-2">
               <span className="text-2xl">{category === 'artifacts' ? '🏺' : '⚡'}</span>
               <span className="font-pixel text-xs text-yellow-300">
@@ -307,9 +351,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               </span>
             </div>
           ) : (
-            sortedEntries.map((entry, idx) => {
+            top50Entries.map((entry, idx) => {
               const rank = idx + 1;
-              const isHighlight = entry.id === highlightId;
+              const isUserRun = entry.id === userRunId || entry.id === highlightId;
+              const isNew = entry.id === highlightId;
               const displayName = entry.runName || entry.playerName || `Run #${rank}`;
               const artCount = getEntryArtifactCount(entry);
 
@@ -325,7 +370,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   }}
                   title="Click to view run summary and created words"
                   className={`grid grid-cols-12 items-center text-[10px] sm:text-xs py-2 px-2 transition-all cursor-pointer select-none group ${
-                    isHighlight
+                    isUserRun
                       ? 'bg-amber-500/25 text-yellow-300 ring-2 ring-yellow-400 font-bold hover:bg-amber-500/35'
                       : rank === 1
                       ? 'bg-yellow-950/20 text-yellow-200 hover:bg-yellow-950/40'
@@ -347,11 +392,15 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                       <span className="tracking-wide group-hover:underline truncate" title={displayName}>
                         {displayName}
                       </span>
-                      {isHighlight && (
+                      {isNew ? (
                         <span className="text-[7px] bg-yellow-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
                           NEW
                         </span>
-                      )}
+                      ) : isUserRun ? (
+                        <span className="text-[7px] bg-amber-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
+                          YOU
+                        </span>
+                      ) : null}
                     </div>
                     <span className="text-[8px] text-cyan-300/80 truncate">
                       {entry.characterName}
@@ -411,6 +460,67 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             })
           )}
         </div>
+
+        {/* Sticky Bottom Overlay if user is ranked outside top 50 (> 50) */}
+        {!isUserInTop50 && userEntry && userRank && (
+          <div className="border-t-2 border-yellow-400/80 bg-linear-to-r from-amber-950/95 via-slate-950 to-amber-950/95 shadow-[0_-6px_16px_rgba(0,0,0,0.8)] select-none">
+            <div className="bg-yellow-400/90 text-slate-950 px-2 py-0.5 text-[8px] font-pixel font-bold flex items-center justify-between tracking-wider">
+              <span className="flex items-center gap-1">
+                <span>• • •</span>
+                <span>YOUR STANDING (OUTSIDE TOP 50)</span>
+                <span>• • •</span>
+              </span>
+              <span>RANK #{userRank}</span>
+            </div>
+
+            <div
+              onClick={() => {
+                sounds.playSelect();
+                setInspectingRun({ entry: userEntry, rank: userRank, category });
+              }}
+              title="Click to view your run summary"
+              className="grid grid-cols-12 items-center text-[10px] sm:text-xs py-2 px-2 bg-amber-500/20 hover:bg-amber-500/35 text-yellow-300 cursor-pointer font-pixel transition-all group"
+            >
+              <div className="col-span-2 text-left font-bold flex items-center gap-1">
+                <span className="text-yellow-400 font-mono text-xs sm:text-sm">#{userRank}</span>
+              </div>
+
+              <div className="col-span-4 text-left truncate flex flex-col justify-center pr-1">
+                <div className="flex items-center gap-1 truncate">
+                  <span className="tracking-wide underline truncate font-bold text-yellow-200">
+                    {userEntry.runName || userEntry.playerName || 'Your Run'}
+                  </span>
+                  <span className="text-[7px] bg-yellow-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
+                    YOU
+                  </span>
+                </div>
+                <span className="text-[8px] text-cyan-300/80 truncate">
+                  {userEntry.characterName}
+                </span>
+              </div>
+
+              <div className="col-span-2 text-center">
+                <span className="font-bold text-yellow-300 bg-amber-950/80 border border-amber-500/50 px-1.5 py-0.5 rounded-xs text-[9px] sm:text-[10px] inline-flex items-center gap-0.5">
+                  <span>🏺</span>
+                  <span>{getEntryArtifactCount(userEntry)}</span>
+                </span>
+              </div>
+
+              <div className="col-span-2 text-center text-[10px] font-mono text-emerald-400">
+                {userEntry.totalKana}
+              </div>
+
+              <div className="col-span-2 text-right font-mono flex items-center justify-end gap-1">
+                <span className="font-bold text-yellow-300">
+                  {formatTime(userEntry.playtimeSeconds)}
+                </span>
+                <span className="text-[8px] text-yellow-400 group-hover:translate-x-0.5 transition-transform">
+                  ➔
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sub-footer options & Admin Actions */}

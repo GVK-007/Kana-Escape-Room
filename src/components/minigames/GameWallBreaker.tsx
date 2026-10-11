@@ -134,20 +134,26 @@ export const GameWallBreaker: React.FC<GameWallBreakerProps> = ({ onSuccess }) =
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const s = stateRef.current;
 
       // Handle paddle expand timer
       if (s.expandTimer > 0) {
-        s.expandTimer -= 1;
+        s.expandTimer -= dt;
         if (s.expandTimer <= 0) {
           s.paddleW = 44;
         }
       }
 
       // Allow paddle to move faster as the ball moves faster
-      const pSpeed = 4.2 * Math.sqrt(s.speedFactor);
+      const pSpeed = 4.2 * Math.sqrt(s.speedFactor) * dt;
       if (s.keys.left) s.paddleX = Math.max(4, s.paddleX - pSpeed);
       if (s.keys.right) s.paddleX = Math.min(260 - s.paddleW - 4, s.paddleX + pSpeed);
 
@@ -163,7 +169,7 @@ export const GameWallBreaker: React.FC<GameWallBreakerProps> = ({ onSuccess }) =
         // Update powerups
         for (let i = powerUpsRef.current.length - 1; i >= 0; i--) {
           const pu = powerUpsRef.current[i];
-          pu.y += pu.vy;
+          pu.y += pu.vy * dt;
 
           // Paddle collision with powerup
           if (
@@ -216,8 +222,8 @@ export const GameWallBreaker: React.FC<GameWallBreakerProps> = ({ onSuccess }) =
         // Update all balls
         for (let bIdx = s.balls.length - 1; bIdx >= 0; bIdx--) {
           const ball = s.balls[bIdx];
-          ball.x += ball.vx;
-          ball.y += ball.vy;
+          ball.x += ball.vx * dt;
+          ball.y += ball.vy * dt;
 
           // Bounce walls
           if (ball.x <= 4) {

@@ -144,13 +144,19 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const s = stateRef.current;
 
       // Update Sliders based on current active phase
       if (s.phase === 'PLAYER_X' || s.phase === 'AI_X') {
-        s.sliderX += s.sliderXDir;
+        s.sliderX += s.sliderXDir * dt;
         if (s.sliderX >= 235) {
           s.sliderX = 235;
           s.sliderXDir = -Math.abs(s.sliderXDir);
@@ -161,7 +167,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
 
         // AI automated aiming logic for X
         if (s.phase === 'AI_X') {
-          s.aiTimer += 1;
+          s.aiTimer += dt;
           const diff = Math.abs(s.sliderX - s.aiTargetX);
           if ((diff < 8 && s.aiTimer > 15) || s.aiTimer > 75) {
             sounds.playBlip(480);
@@ -171,7 +177,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
           }
         }
       } else if (s.phase === 'PLAYER_Y' || s.phase === 'AI_Y') {
-        s.sliderY += s.sliderYDir;
+        s.sliderY += s.sliderYDir * dt;
         if (s.sliderY >= 205) {
           s.sliderY = 205;
           s.sliderYDir = -Math.abs(s.sliderYDir);
@@ -182,7 +188,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
 
         // AI automated aiming logic for Y
         if (s.phase === 'AI_Y') {
-          s.aiTimer += 1;
+          s.aiTimer += dt;
           const diff = Math.abs(s.sliderY - s.aiTargetY);
           if ((diff < 8 && s.aiTimer > 15) || s.aiTimer > 75) {
             sounds.playSelect();

@@ -509,6 +509,7 @@ export default function App() {
               isDoorUnlocked={isDoorUnlocked}
               completedMinigames={completedMinigames}
               isLocked={gameState !== 'PLAYING' || activeTableId !== null}
+              isFrozen={gameState !== 'PLAYING' || activeTableId !== null}
               onInteract={handleInteract}
               onInteractDoor={handleInteractDoor}
               onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}

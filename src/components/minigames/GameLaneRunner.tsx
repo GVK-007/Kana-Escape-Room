@@ -78,18 +78,23 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
     let animId: number;
     let spawnCounter = 0;
     let lastHudTime = 0;
+    let lastTime = performance.now();
 
-    const loop = () => {
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      const deltaMs = now - lastTime;
+      lastTime = now;
+      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
+
       const s = stateRef.current;
 
       if (!s.won && !s.gameOver) {
         // Progressively faster speed: starts at 3.2, ramps up to 7.8!
         const progress = Math.min(1, s.distance / targetMetersRef.current);
         const currentSpeed = 3.2 + progress * 4.6;
-        s.distance += 0.2 + progress * 0.25;
+        s.distance += (0.2 + progress * 0.25) * dt;
 
         // Throttle React state updates to 10Hz instead of 60Hz to save CPU
-        const now = performance.now();
         if (now - lastHudTime > 100) {
           lastHudTime = now;
           setDistance(Math.floor(s.distance));
@@ -98,10 +103,10 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
 
         // Smooth lane interpolation
         const targetX = s.laneX[s.lane];
-        s.currentX += (targetX - s.currentX) * 0.35;
+        s.currentX += (targetX - s.currentX) * Math.min(1.0, 0.35 * dt);
 
         // Progressive obstacle spawn interval
-        spawnCounter += 1;
+        spawnCounter += dt;
         const spawnThreshold = Math.max(18, Math.floor(40 - progress * 20));
         if (spawnCounter > spawnThreshold) {
           spawnCounter = 0;
@@ -116,7 +121,7 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
         // Update obstacles
         for (let i = s.obstacles.length - 1; i >= 0; i--) {
           const obs = s.obstacles[i];
-          obs.y += currentSpeed;
+          obs.y += currentSpeed * dt;
 
           // Check collision with player at y: 155
           if (obs.y >= 138 && obs.y <= 168 && s.lane === obs.lane) {

@@ -92,7 +92,7 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
     }
   });
 
-  const merged = sortLeaderboard(Array.from(map.values()), 'time').slice(0, 100);
+  const merged = sortLeaderboard(Array.from(map.values()), 'time').slice(0, 200);
 
   try {
     localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(merged));
@@ -101,6 +101,23 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
   }
 
   return merged;
+};
+
+export const getLastPlayerRunId = (): string | null => {
+  try {
+    return localStorage.getItem('kana_last_player_run_id');
+  } catch {
+    return null;
+  }
+};
+
+export const getMyRunIds = (): string[] => {
+  try {
+    const raw = localStorage.getItem('kana_my_run_ids');
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
 };
 
 export type LeaderboardCategory = 'time' | 'artifacts';
@@ -192,10 +209,20 @@ export const saveLeaderboardEntry = (params: {
   };
 
   const combined = [...current.filter((e) => e.id !== newEntry.id), newEntry];
-  const updated = sortLeaderboard(combined, 'time').slice(0, 100);
+  const updated = sortLeaderboard(combined, 'time').slice(0, 200);
 
   try {
     localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(updated));
+    localStorage.setItem('kana_last_player_run_id', newEntry.id);
+    const myRunsRaw = localStorage.getItem('kana_my_run_ids');
+    let myRuns: string[] = [];
+    try {
+      myRuns = myRunsRaw ? JSON.parse(myRunsRaw) : [];
+    } catch {}
+    if (!myRuns.includes(newEntry.id)) {
+      myRuns.push(newEntry.id);
+      localStorage.setItem('kana_my_run_ids', JSON.stringify(myRuns));
+    }
   } catch {
     // ignore
   }
