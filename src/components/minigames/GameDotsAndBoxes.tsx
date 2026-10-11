@@ -264,16 +264,7 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
       Object.keys(s.hLines).length === DOTS * BOXES &&
       Object.keys(s.vLines).length === BOXES * DOTS;
 
-    if (s.playerScore >= NEEDED_TO_WIN) {
-      s.won = true;
-      setWon(true);
-      sounds.playSuccess();
-      setTimeout(() => onSuccessRef.current(), 750);
-    } else if (s.aiScore >= NEEDED_TO_WIN) {
-      s.gameOver = true;
-      setGameOver(true);
-      sounds.playFail();
-    } else if (totalClaimed >= BOXES * BOXES || allLinesDone) {
+    if (totalClaimed >= BOXES * BOXES || allLinesDone) {
       if (s.playerScore > s.aiScore) {
         s.won = true;
         setWon(true);
@@ -397,7 +388,7 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
     <div className="flex flex-col items-center select-none font-pixel w-full max-w-[540px]">
       <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm">
         <span className="text-cyan-400 font-bold">YOU: {playerScore} BOXES</span>
-        <span className="text-yellow-400 font-mono text-[10px] sm:text-xs">5x5 DOTS (16 BOXES — FIRST TO 9)</span>
+        <span className="text-yellow-400 font-mono text-[10px] sm:text-xs">5x5 DOTS (16 BOXES — CLAIM MOST BOXES)</span>
         <span className="text-rose-400 font-bold">AI: {aiScore} BOXES</span>
       </div>
 
@@ -418,8 +409,8 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
 
         {won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in z-20">
-            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ MAJORITY CAPTURED! ★</span>
-            <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">You conquered the 5x5 territory!</span>
+            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ ALL 16 BOXES COMPLETED! ★</span>
+            <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">You claimed the majority of the boxes!</span>
             <button
               onClick={() => onSuccessRef.current()}
               className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer shadow-lg"

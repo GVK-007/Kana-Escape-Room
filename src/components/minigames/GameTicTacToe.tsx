@@ -12,7 +12,7 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
   const [board, setBoard] = useState<Cell[]>(Array(9).fill(null));
   const [gameCount, setGameCount] = useState(1);
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
-  const [status, setStatus] = useState<string>('Match 1/5 — Align 3 in a row!');
+  const [status, setStatus] = useState<string>('Align 3 in a row to win!');
   const [won, setWon] = useState(false);
 
   const onSuccessRef = useRef(onSuccess);
@@ -35,6 +35,46 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
     return null;
   };
 
+  const minimax = (b: Cell[], isMaximizing: boolean, depth = 0): { score: number; index: number } => {
+    const winner = checkWinner(b);
+    if (winner === 'O') return { score: 10 - depth, index: -1 };
+    if (winner === 'X') return { score: -10 + depth, index: -1 };
+    if (winner === 'draw') return { score: 0, index: -1 };
+
+    const available: number[] = [];
+    for (let i = 0; i < 9; i++) {
+      if (!b[i]) available.push(i);
+    }
+
+    if (isMaximizing) {
+      let bestScore = -Infinity;
+      let bestMove = available[0] ?? -1;
+      for (const idx of available) {
+        b[idx] = 'O';
+        const res = minimax(b, false, depth + 1);
+        b[idx] = null;
+        if (res.score > bestScore) {
+          bestScore = res.score;
+          bestMove = idx;
+        }
+      }
+      return { score: bestScore, index: bestMove };
+    } else {
+      let bestScore = Infinity;
+      let bestMove = available[0] ?? -1;
+      for (const idx of available) {
+        b[idx] = 'X';
+        const res = minimax(b, true, depth + 1);
+        b[idx] = null;
+        if (res.score < bestScore) {
+          bestScore = res.score;
+          bestMove = idx;
+        }
+      }
+      return { score: bestScore, index: bestMove };
+    }
+  };
+
   const aiMove = (currentBoard: Cell[]) => {
     const currentGame = gameCountRef.current;
     const available: number[] = [];
@@ -45,44 +85,17 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
 
     let moveIndex = -1;
 
-    // By games 2-5, AI becomes increasingly generous so player is guaranteed to win within 5 games!
-    const shouldMakeMistake = currentGame >= 3 || Math.random() < (currentGame * 0.22);
+    // Follow perfect minimax strategy for first 3 games; games 4+ start making occasional mistakes
+    const shouldMakeMistake = currentGame > 3 && Math.random() < 0.65;
 
     if (!shouldMakeMistake) {
-      // 1. Check if AI can win immediately
-      for (const idx of available) {
-        currentBoard[idx] = 'O';
-        if (checkWinner(currentBoard) === 'O') {
-          moveIndex = idx;
-          currentBoard[idx] = null;
-          break;
-        }
-        currentBoard[idx] = null;
-      }
-
-      // 2. Check if player has 2 in a row to block
-      if (moveIndex === -1 && currentGame <= 2) {
-        for (const idx of available) {
-          currentBoard[idx] = 'X';
-          if (checkWinner(currentBoard) === 'X') {
-            moveIndex = idx;
-            currentBoard[idx] = null;
-            break;
-          }
-          currentBoard[idx] = null;
-        }
-      }
+      moveIndex = minimax(currentBoard, true).index;
+    } else {
+      moveIndex = available[Math.floor(Math.random() * available.length)];
     }
 
-    // 3. Casual / adventurous flank move (leaves opportunities for player to achieve 3-in-a-row)
     if (moveIndex === -1) {
-      // Pick random open position (not blocking center if player wants it)
-      const nonCenter = available.filter((idx) => idx !== 4);
-      if (currentGame >= 2 && nonCenter.length > 0) {
-        moveIndex = nonCenter[Math.floor(Math.random() * nonCenter.length)];
-      } else {
-        moveIndex = available[Math.floor(Math.random() * available.length)];
-      }
+      moveIndex = available[0];
     }
 
     if (moveIndex !== -1) {
@@ -95,11 +108,11 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
       if (win === 'O') {
         setStatus('AI got 3 in a row! Rematching...');
         sounds.playFail();
-        setTimeout(handleRematch, 1400);
+        setTimeout(handleRematch, 450);
       } else if (win === 'draw') {
         sounds.playBlip(300);
-        setStatus('STALEMATE! Rematching with higher AI opening...');
-        setTimeout(handleRematch, 1200);
+        setStatus('STALEMATE! Rematching...');
+        setTimeout(handleRematch, 450);
       } else {
         setIsPlayerTurn(true);
         setStatus('Your Turn (X)');
@@ -124,23 +137,23 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
       setTimeout(() => onSuccessRef.current(), 750);
     } else if (win === 'draw') {
       sounds.playBlip(300);
-      setStatus('STALEMATE! Rematching with higher AI opening...');
-      setTimeout(handleRematch, 1200);
+      setStatus('STALEMATE! Rematching...');
+      setTimeout(handleRematch, 450);
     } else {
       setStatus('AI is thinking...');
       setTimeout(() => {
         aiMove(next);
-      }, 350);
+      }, 250);
     }
   };
 
   const handleRematch = () => {
-    const nextGame = Math.min(5, gameCountRef.current + 1);
+    const nextGame = gameCountRef.current + 1;
     gameCountRef.current = nextGame;
     setGameCount(nextGame);
     setBoard(Array(9).fill(null));
     setIsPlayerTurn(true);
-    setStatus(`Match ${nextGame}/5 — Align 3 in a row!`);
+    setStatus('Align 3 in a row to win!');
   };
 
   return (
@@ -148,7 +161,7 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
       <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm">
         <span className="text-cyan-400 font-bold">TIC-TAC-TOE</span>
         <span className="text-amber-300 text-[10px] sm:text-xs font-mono bg-amber-950/80 px-2 py-0.5 border border-amber-500">
-          MATCH {gameCount}/5
+          VS AI
         </span>
         <span className="text-yellow-400 text-[10px] sm:text-xs">3-IN-A-ROW</span>
       </div>
@@ -181,7 +194,7 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in z-20">
             <span className="text-emerald-400 text-sm sm:text-base mb-2 font-bold">★ 3 IN A ROW ACHIEVED! ★</span>
             <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">
-              Decisive victory attained in Match {gameCount}!
+              Decisive victory attained!
             </span>
             <button
               onClick={() => onSuccessRef.current()}
@@ -194,7 +207,7 @@ export const GameTicTacToe: React.FC<GameTicTacToeProps> = ({ onSuccess }) => {
       </div>
 
       <p className="text-[10px] text-slate-400 mt-3 text-center">
-        Draws will rematch. AI opens up tactics so you win within 5 matches!
+        Draws rematch instantly. Win a round against the AI to unlock!
       </p>
     </div>
   );

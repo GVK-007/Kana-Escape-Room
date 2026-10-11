@@ -31,11 +31,17 @@ interface Particle {
   size: number;
 }
 
+interface HistoryState {
+  tiles: TileItem[];
+  score: number;
+}
+
 let nextTileId = 1;
 
 export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
   const [tiles, setTiles] = useState<TileItem[]>(() => initTiles());
   const [score, setScore] = useState(0);
+  const [history, setHistory] = useState<HistoryState[]>([]);
   const [won, setWon] = useState(false);
   const [gameOver, setGameOver] = useState(false);
 
@@ -220,6 +226,15 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
         }
 
         if (changed) {
+          // Record snapshot for undo (up to 2 moves back)
+          setHistory((prevH) => {
+            const snapshot: HistoryState = {
+              tiles: prevTiles.map((t) => ({ ...t })),
+              score,
+            };
+            return [...prevH.slice(-1), snapshot];
+          });
+
           // Add 1 random new tile in open slot
           const occupied = new Set(newTiles.map((t) => `${t.r},${t.c}`));
           const emptySlots: { r: number; c: number }[] = [];
@@ -276,8 +291,18 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
         return newTiles;
       });
     },
-    [won, gameOver]
+    [won, gameOver, score]
   );
+
+  const undo = useCallback(() => {
+    if (history.length === 0 || won) return;
+    const last = history[history.length - 1];
+    setHistory((h) => h.slice(0, -1));
+    setTiles(last.tiles.map((t) => ({ ...t })));
+    setScore(last.score);
+    setGameOver(false);
+    sounds.playSelect();
+  }, [history, won]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -293,11 +318,14 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
       } else if (['ArrowRight', 'KeyD'].includes(e.code)) {
         e.preventDefault();
         move('right');
+      } else if (['KeyU', 'KeyZ', 'Backspace'].includes(e.code)) {
+        e.preventDefault();
+        undo();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [move]);
+  }, [move, undo]);
 
   const getTileStyle = (val: number) => {
     switch (val) {
@@ -325,6 +353,7 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
   const restart = () => {
     setTiles(initTiles());
     setScore(0);
+    setHistory([]);
     setWon(false);
     setGameOver(false);
   };
@@ -332,7 +361,7 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
   return (
     <div className="flex flex-col items-center select-none font-pixel w-full max-w-[500px]">
       {/* Score Header */}
-      <div className="flex justify-between items-center w-full max-w-[340px] mb-3 text-xs sm:text-sm">
+      <div className="flex justify-between items-center w-full max-w-[340px] mb-2 text-xs sm:text-sm">
         <span className="text-amber-400 font-bold">SCORE: {score}</span>
         <span className="text-yellow-300 font-mono text-[10px] sm:text-xs">GOAL: {TARGET_TILE} TILE</span>
         <span className="text-cyan-400 font-bold">MAX: {maxTile}</span>
@@ -426,14 +455,44 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
         {gameOver && !won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center rounded-lg border-2 border-red-500 p-4 z-40">
             <span className="text-red-400 text-xs mb-3 font-bold">NO MOVES REMAINING</span>
-            <button
-              onClick={restart}
-              className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] border-2 border-white cursor-pointer"
-            >
-              TRY AGAIN
-            </button>
+            <div className="flex items-center gap-2">
+              {history.length > 0 && (
+                <button
+                  onClick={undo}
+                  className="px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-black text-[10px] font-bold border-2 border-yellow-300 cursor-pointer shadow-md"
+                >
+                  ⤺ UNDO MOVE
+                </button>
+              )}
+              <button
+                onClick={restart}
+                className="px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-[10px] border-2 border-white cursor-pointer"
+              >
+                TRY AGAIN
+              </button>
+            </div>
           </div>
         )}
+      </div>
+
+      {/* Undo Button Control Bar */}
+      <div className="flex items-center justify-between w-full max-w-[320px] mt-2 mb-1 px-1">
+        <button
+          onClick={undo}
+          disabled={history.length === 0 || won}
+          className={`px-3 py-1.5 border-2 font-pixel text-xs flex items-center gap-1.5 transition-all shadow-md rounded ${
+            history.length > 0 && !won
+              ? 'bg-amber-600 hover:bg-amber-500 text-black border-yellow-300 cursor-pointer active:scale-95'
+              : 'bg-slate-900 border-slate-700 text-slate-500 opacity-60 cursor-not-allowed'
+          }`}
+          title="Undo up to 2 moves [U] / [Backspace]"
+        >
+          <span>⤺</span>
+          <span>UNDO ({history.length}/2)</span>
+        </button>
+        <span className="text-[9px] text-slate-400 font-mono">
+          [U] or [Backspace]
+        </span>
       </div>
 
       {/* D-Pad Buttons */}

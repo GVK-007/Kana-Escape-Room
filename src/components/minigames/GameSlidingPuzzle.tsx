@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { sounds } from '../../utils/audio';
 
 interface GameSlidingPuzzleProps {
@@ -78,6 +78,66 @@ export const GameSlidingPuzzle: React.FC<GameSlidingPuzzleProps> = ({ onSuccess 
       }
     }
   };
+
+  const moveDirection = useCallback((dir: 'up' | 'down' | 'left' | 'right') => {
+    if (won) return;
+    setTiles((prevTiles) => {
+      const emptyIndex = prevTiles.indexOf(0);
+      const emptyRow = Math.floor(emptyIndex / 3);
+      const emptyCol = emptyIndex % 3;
+
+      let targetRow = emptyRow;
+      let targetCol = emptyCol;
+
+      if (dir === 'up') targetRow = emptyRow + 1;
+      else if (dir === 'down') targetRow = emptyRow - 1;
+      else if (dir === 'left') targetCol = emptyCol + 1;
+      else if (dir === 'right') targetCol = emptyCol - 1;
+
+      if (targetRow < 0 || targetRow > 2 || targetCol < 0 || targetCol > 2) {
+        return prevTiles;
+      }
+
+      const targetIndex = targetRow * 3 + targetCol;
+      sounds.playBlip(480);
+
+      const next = [...prevTiles];
+      next[emptyIndex] = prevTiles[targetIndex];
+      next[targetIndex] = 0;
+
+      setMoves((m) => m + 1);
+      setHintIndex(null);
+
+      if (checkWin(next)) {
+        setWon(true);
+        sounds.playSuccess();
+        setTimeout(() => onSuccessRef.current(), 750);
+      }
+
+      return next;
+    });
+  }, [won]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (won) return;
+      if (e.code === 'ArrowUp' || e.code === 'KeyW') {
+        e.preventDefault();
+        moveDirection('up');
+      } else if (e.code === 'ArrowDown' || e.code === 'KeyS') {
+        e.preventDefault();
+        moveDirection('down');
+      } else if (e.code === 'ArrowLeft' || e.code === 'KeyA') {
+        e.preventDefault();
+        moveDirection('left');
+      } else if (e.code === 'ArrowRight' || e.code === 'KeyD') {
+        e.preventDefault();
+        moveDirection('right');
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [moveDirection, won]);
 
   // 15s Cooldown Timer
   useEffect(() => {
@@ -192,7 +252,7 @@ export const GameSlidingPuzzle: React.FC<GameSlidingPuzzleProps> = ({ onSuccess 
       </div>
 
       <p className="text-[10px] sm:text-xs text-slate-400 mt-3 text-center">
-        Randomized 8-puzzle • Slide tiles into order 1 to 8 • Use 💡 Hint if stuck!
+        Arrow Keys / WASD or Click tiles • Order tiles 1 to 8 • Use 💡 Hint if stuck!
       </p>
     </div>
   );

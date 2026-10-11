@@ -135,7 +135,7 @@ export const GameTimedCode: React.FC<GameTimedCodeProps> = ({ onSuccess, codeLen
       <div className="flex justify-between items-center w-full mb-1 text-[11px] sm:text-xs px-1">
         <div className="flex items-center gap-1.5">
           <span className="text-amber-400 font-bold">SECURITY KEYPAD</span>
-          <span className="text-[9px] text-slate-400 font-mono hidden xs:inline">(KANJI 0-9)</span>
+          <span className="text-[9px] text-slate-400 font-mono hidden xs:inline">(KANJI NUMBERS)</span>
         </div>
         <span className={`font-bold ${timeLeft <= 4 ? 'text-red-400 animate-pulse' : 'text-slate-300'}`}>
           TIME: {timeLeft}s
@@ -171,7 +171,7 @@ export const GameTimedCode: React.FC<GameTimedCodeProps> = ({ onSuccess, codeLen
                     {info.kanji}
                   </span>
                   <span className="text-[8px] sm:text-[9px] text-emerald-200/90 font-mono">
-                    {info.digit} • {info.romaji}
+                    {info.romaji}
                   </span>
                 </div>
               );
@@ -227,7 +227,7 @@ export const GameTimedCode: React.FC<GameTimedCodeProps> = ({ onSuccess, codeLen
                   {info.kanji}
                 </span>
                 <span className="text-[8px] sm:text-[9px] text-slate-400 group-hover:text-white font-mono">
-                  {info.digit} • {info.romaji}
+                  {info.romaji}
                 </span>
               </button>
             );
@@ -247,7 +247,7 @@ export const GameTimedCode: React.FC<GameTimedCodeProps> = ({ onSuccess, codeLen
               〇
             </span>
             <span className="text-[8px] sm:text-[9px] text-slate-400 group-hover:text-white font-mono">
-              0 • zero
+              zero
             </span>
           </button>
           <button
@@ -282,7 +282,7 @@ export const GameTimedCode: React.FC<GameTimedCodeProps> = ({ onSuccess, codeLen
       </div>
 
       <p className="text-[9px] text-slate-400 mt-1 text-center">
-        Numbers (0-9) or Japanese Keypad Buttons
+        Keyboard (0-9) or Japanese Keypad Buttons
       </p>
     </div>
   );
