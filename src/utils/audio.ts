@@ -751,9 +751,8 @@ class SoundEngine {
         (v) => v.lang.toLowerCase().startsWith('ja') || v.lang.toLowerCase().includes('jp')
       );
 
-      // Prevent non-Japanese TTS voices from announcing Kanji as "Chinese letter [word]"
-      const hasKanji = /[\u4e00-\u9faf]/.test(text);
-      if (!jaVoice && hasKanji) {
+      // NEVER allow non-Japanese fallback voices (which announce "Chinese character" or speak English)
+      if (!jaVoice) {
         if (onFail) onFail();
         return false;
       }

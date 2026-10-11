@@ -17,7 +17,100 @@ interface InventoryModalProps {
   onWordCrafted?: (word: string) => void;
 }
 
-// Canvas preview helper for character model inside inventory
+export type WordRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export interface WordRarityInfo {
+  rarity: WordRarity;
+  label: string;
+  room: 'R1' | 'R2' | 'R3';
+  roomName: string;
+  bgClass: string;
+  borderClass: string;
+  textClass: string;
+  badgeClass: string;
+  glowClass: string;
+}
+
+export function getWordRarityAndRoom(word: string): WordRarityInfo {
+  let room: 'R1' | 'R2' | 'R3' = 'R1';
+  let roomName = 'Room 1: Workshop';
+
+  const r3Chars = new Set(['で', 'ぐ', 'ち', 'さ', 'く', 'じ', 'よ', 'う', 'デ', 'グ', 'チ', 'サ', 'ク', 'ジ', 'ヨ', 'ウ']);
+  const r2Chars = new Set(['び', 'ら', 'い', 'ぬ', 'ほ', 'ん', 'ま', 'ビ', 'ラ', 'イ', 'ヌ', 'ホ', 'ン', 'マ']);
+
+  if (word === 'でぐち' || Array.from(word).some((c) => r3Chars.has(c))) {
+    room = 'R3';
+    roomName = 'Room 3: Sacred Vault';
+  } else if (word === 'とびら' || Array.from(word).some((c) => r2Chars.has(c))) {
+    room = 'R2';
+    roomName = 'Room 2: Grand Archive';
+  }
+
+  const isExitWord = word === 'かぎ' || word === 'とびら' || word === 'でぐち' || word === 'ほうぎょく';
+  const len = Array.from(word).length;
+
+  let rarity: WordRarity = 'common';
+  if (isExitWord || len >= 4) {
+    rarity = 'legendary';
+  } else if (len === 3) {
+    const epicWords = new Set(['かがみ', 'かたな', 'しずく', 'ひかり', 'こころ', 'きつね', 'あめ']);
+    rarity = epicWords.has(word) ? 'epic' : 'rare';
+  } else if (len === 2) {
+    const commonWords = new Set(['ねこ', 'いぬ', 'みず', 'き', 'ひ', 'め', 'て', 'かみ', 'かこ']);
+    rarity = commonWords.has(word) ? 'common' : 'uncommon';
+  }
+
+  const configs: Record<WordRarity, Omit<WordRarityInfo, 'rarity' | 'room' | 'roomName'>> = {
+    common: {
+      label: 'COMMON',
+      bgClass: 'bg-slate-900/90',
+      borderClass: 'border-slate-600',
+      textClass: 'text-slate-300',
+      badgeClass: 'bg-slate-800 text-slate-300 border-slate-600',
+      glowClass: '',
+    },
+    uncommon: {
+      label: 'UNCOMMON',
+      bgClass: 'bg-emerald-950/80',
+      borderClass: 'border-emerald-500',
+      textClass: 'text-emerald-300',
+      badgeClass: 'bg-emerald-900/90 text-emerald-200 border-emerald-500',
+      glowClass: 'shadow-[0_0_8px_rgba(16,185,129,0.3)]',
+    },
+    rare: {
+      label: 'RARE',
+      bgClass: 'bg-cyan-950/80',
+      borderClass: 'border-cyan-400',
+      textClass: 'text-cyan-200',
+      badgeClass: 'bg-cyan-900/90 text-cyan-200 border-cyan-400',
+      glowClass: 'shadow-[0_0_10px_rgba(6,182,212,0.35)]',
+    },
+    epic: {
+      label: 'EPIC',
+      bgClass: 'bg-purple-950/80',
+      borderClass: 'border-purple-400',
+      textClass: 'text-purple-200',
+      badgeClass: 'bg-purple-900/90 text-purple-200 border-purple-400',
+      glowClass: 'shadow-[0_0_12px_rgba(168,85,247,0.4)]',
+    },
+    legendary: {
+      label: 'LEGENDARY',
+      bgClass: 'bg-amber-950/90',
+      borderClass: 'border-amber-400',
+      textClass: 'text-amber-200',
+      badgeClass: 'bg-amber-900 text-amber-100 border-amber-300',
+      glowClass: 'shadow-[0_0_14px_rgba(245,158,11,0.5)] ring-1 ring-yellow-400/50',
+    },
+  };
+
+  return {
+    rarity,
+    room,
+    roomName,
+    ...configs[rarity],
+  };
+}
+
 const CharacterPreviewCanvas: React.FC<{ characterId: CharacterId; frame: number }> = ({ characterId, frame }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -49,7 +142,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const theme = getRoomTheme(currentRoom.id);
   const charProfile = CHARACTERS.find((c) => c.id === characterId) || CHARACTERS[0];
 
-  // 4 building slots
   const [slots, setSlots] = useState<(KanaItem | null)[]>([null, null, null, null]);
   const [hoveredKana, setHoveredKana] = useState<KanaItem | null>(null);
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
@@ -59,7 +151,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const speechTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastEvaluatedWordRef = useRef<string>('');
 
-  // Idle character animation loop
   useEffect(() => {
     const timer = setInterval(() => {
       setAnimFrame((f) => (f + 1) % 2);
@@ -67,7 +158,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     return () => clearInterval(timer);
   }, []);
 
-  // Cleanup pending audio timers on unmount
   useEffect(() => {
     return () => {
       if (wordAppraiseTimerRef.current) clearTimeout(wordAppraiseTimerRef.current);
@@ -75,7 +165,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     };
   }, []);
 
-  // Key listeners (Escape / I to close)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' || e.code === 'KeyI') {
@@ -88,7 +177,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  // Formed word string
   const currentWordStr = slots
     .filter((s): s is KanaItem => s !== null)
     .map((s) => s.character)
@@ -97,7 +185,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const wordData: JapaneseWord | null = currentWordStr ? lookupJapaneseWord(currentWordStr) : null;
   const isTargetWord = wordData && wordData.word === currentRoom.targetWord;
 
-  // Add kana to next available slot
   const handleKanaClick = (item: KanaItem) => {
     sounds.playSelect();
     sounds.speakJapanese(item.character);
@@ -110,7 +197,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     }
   };
 
-  // Remove kana from slot
   const handleSlotClick = (index: number) => {
     if (slots[index] === null) return;
     if (wordAppraiseTimerRef.current) {
@@ -129,7 +215,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     checkWord(nextSlots);
   };
 
-  // Clear all slots
   const handleClear = () => {
     if (wordAppraiseTimerRef.current) {
       clearTimeout(wordAppraiseTimerRef.current);
@@ -144,7 +229,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     setSlots([null, null, null, null]);
   };
 
-  // Check word validity and room target match with natural breathing delay
   const checkWord = (currentSlots: (KanaItem | null)[]) => {
     if (wordAppraiseTimerRef.current) {
       clearTimeout(wordAppraiseTimerRef.current);
@@ -189,7 +273,6 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     }
   };
 
-  // Drag and drop handlers
   const handleDragStart = (e: React.DragEvent, item: KanaItem, sourceSlotIndex?: number) => {
     e.dataTransfer.setData('text/plain', JSON.stringify({ item, sourceSlotIndex }));
   };
@@ -219,23 +302,20 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
     }
   };
 
-  // 2 rows of collected Kana slots (16 slots minimum)
   const kanaSlotCount = Math.max(16, inventory.length);
   const kanaSlots = Array.from({ length: kanaSlotCount }, (_, idx) => inventory[idx] || null);
 
-  // 2 rows of collected words / collectibles (16 slots minimum)
-  // Collectibles include all discovered crafted words
   const collectibleSlotCount = Math.max(16, craftedWords.length);
   const collectibleSlots = Array.from({ length: collectibleSlotCount }, (_, idx) => craftedWords[idx] || null);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-1.5 sm:p-4 select-none">
-      <div className={`relative bg-[#151426] border-4 ${theme.borderClass} ${theme.pixelBoxClass} p-3 sm:p-5 max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full shadow-2xl flex flex-col gap-3 sm:gap-4 max-h-[96dvh] overflow-y-auto`}>
+      <div className={`relative bg-[#151426] border-4 ${theme.borderClass} ${theme.pixelBoxClass} p-2.5 sm:p-5 max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full shadow-2xl flex flex-col gap-2.5 sm:gap-4 max-h-[96dvh] overflow-y-auto`}>
         {/* Header */}
         <div className="flex justify-between items-center pb-2 border-b-2 border-slate-700/80">
           <div className="flex items-center gap-2">
-            <span className="text-lg sm:text-xl">🎒</span>
-            <h2 className="font-pixel text-[11px] sm:text-xs md:text-sm text-yellow-400 tracking-wider">
+            <span className="text-base sm:text-xl">🎒</span>
+            <h2 className="font-pixel text-xs sm:text-sm text-yellow-400 tracking-wider">
               INVENTORY & WORD CRAFTER
             </h2>
           </div>
@@ -250,26 +330,20 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
           </button>
         </div>
 
-        {/* ========================================================= */}
-        {/* TOP SECTION (MINECRAFT INVENTORY LAYOUT):                 */}
-        {/* Player Model (Top Left) + Word Builder / Crafter (Top Right) */}
-        {/* ========================================================= */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 items-stretch">
-          {/* TOP LEFT: PLAYER MODEL INSPECTION CHAMBER */}
-          <div className="md:col-span-4 bg-slate-950/95 border-2 border-slate-700 p-2.5 sm:p-3 flex flex-col items-center justify-between shadow-inner rounded-xs">
-            <div className="w-full flex items-center justify-between border-b border-slate-800 pb-1 mb-1.5 text-[9px] font-pixel text-slate-400">
+        {/* TOP SECTION: Player Inspection (Left) + Word Builder (Right) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-4 items-stretch">
+          {/* Player Inspection */}
+          <div className="md:col-span-4 bg-slate-950/95 border-2 border-slate-700 p-2 sm:p-3 flex flex-col items-center justify-between shadow-inner rounded">
+            <div className="w-full flex items-center justify-between border-b border-slate-800 pb-1 mb-1 text-[9px] font-pixel text-slate-400">
               <span className="text-yellow-400 font-bold">{charProfile.name.toUpperCase()}</span>
               <span className="text-emerald-400">R{currentRoom.number}</span>
             </div>
 
-            {/* Inset Pixel Character Display Frame */}
-            <div className="w-24 h-28 bg-[#0a0915] border-2 border-slate-800 flex items-center justify-center relative shadow-inner my-1">
+            <div className="w-20 h-24 sm:w-24 sm:h-28 bg-[#0a0915] border-2 border-slate-800 flex items-center justify-center relative shadow-inner my-1">
               <CharacterPreviewCanvas characterId={characterId} frame={animFrame} />
-              {/* Subtle floor shadow */}
-              <div className="absolute bottom-2 w-10 h-2 bg-black/60 rounded-full blur-[1px] pointer-events-none" />
+              <div className="absolute bottom-1.5 w-10 h-2 bg-black/60 rounded-full blur-[1px] pointer-events-none" />
             </div>
 
-            {/* Character Info & Active Chamber Target */}
             <div className="w-full text-center flex flex-col gap-1 mt-1">
               <div className="text-[10px] sm:text-xs text-white font-pixel font-bold truncate">
                 {charProfile.name} • {charProfile.title}
@@ -285,35 +359,33 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
             </div>
           </div>
 
-          {/* TOP RIGHT: WORD BUILDER (CRAFTING MATRIX & OUTPUT) */}
-          <div className="md:col-span-8 bg-slate-950/95 border-2 border-slate-700 p-2.5 sm:p-3 flex flex-col justify-between shadow-inner rounded-xs">
-            {/* Crafter Header */}
+          {/* Word Builder */}
+          <div className="md:col-span-8 bg-slate-950/95 border-2 border-slate-700 p-2 sm:p-3 flex flex-col justify-between shadow-inner rounded">
             <div className="flex justify-between items-center border-b border-slate-800 pb-1 mb-2">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs">⚡</span>
                 <span className="font-pixel text-[10px] sm:text-xs text-amber-300 font-bold">
-                  WORD BUILDER (CRAFTING)
+                  WORD BUILDER
                 </span>
               </div>
               <button
                 onClick={handleClear}
                 className="font-pixel text-[8px] sm:text-[9px] px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 cursor-pointer active:scale-95"
               >
-                CLEAR SLOTS
+                CLEAR
               </button>
             </div>
 
-            {/* Crafting Slots & Output Arrow Layout */}
-            <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 py-1">
-              {/* 4 Crafting Slots */}
-              <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Crafting Slots & Output */}
+            <div className="flex items-center justify-center gap-1.5 sm:gap-3 py-1">
+              <div className="flex items-center gap-1 sm:gap-2">
                 {slots.map((slotItem, index) => (
                   <div
                     key={index}
                     onDragOver={(e) => e.preventDefault()}
                     onDrop={(e) => handleDropOnSlot(e, index)}
                     onClick={() => handleSlotClick(index)}
-                    className={`w-12 h-14 sm:w-14 sm:h-16 border-2 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                    className={`w-11 h-13 sm:w-14 sm:h-16 border-2 flex flex-col items-center justify-center cursor-pointer transition-all rounded ${
                       slotItem
                         ? 'bg-slate-900 border-yellow-400 shadow-[0_0_10px_rgba(250,204,21,0.3)] hover:border-red-400'
                         : 'bg-[#090814] border-dashed border-slate-700 hover:border-slate-500 shadow-inner'
@@ -321,32 +393,29 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   >
                     {slotItem ? (
                       <>
-                        <span className="font-kana text-2xl font-bold text-yellow-300">
+                        <span className="font-kana text-xl sm:text-2xl font-bold text-yellow-300">
                           {slotItem.character}
                         </span>
-                        <span className="font-mono text-[9px] text-yellow-100 font-semibold">
+                        <span className="font-mono text-[8px] sm:text-[9px] text-yellow-100 font-semibold">
                           {slotItem.romaji}
                         </span>
-                        <span className="text-[7px] text-slate-400">remove</span>
                       </>
                     ) : (
-                      <span className="font-pixel text-[8px] text-slate-600">SLOT {index + 1}</span>
+                      <span className="font-pixel text-[8px] text-slate-600">{index + 1}</span>
                     )}
                   </div>
                 ))}
               </div>
 
-              {/* Minecraft-style Crafting Arrow */}
-              <div className="text-slate-500 font-pixel text-lg sm:text-xl font-bold px-1 select-none">
+              <div className="text-slate-500 font-pixel text-base sm:text-xl font-bold px-0.5 select-none">
                 ➔
               </div>
 
-              {/* Crafting Result Output Box */}
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-[#090814] border-2 border-slate-700 flex flex-col items-center justify-center shadow-inner relative">
+              <div className="w-13 h-13 sm:w-16 sm:h-16 bg-[#090814] border-2 border-slate-700 flex flex-col items-center justify-center shadow-inner relative rounded">
                 {wordData ? (
                   <>
-                    <span className="text-2xl filter drop-shadow">{wordData.icon}</span>
-                    <span className="font-kana text-[10px] font-bold text-yellow-300 truncate max-w-[50px]">
+                    <span className="text-xl sm:text-2xl filter drop-shadow">{wordData.icon}</span>
+                    <span className="font-kana text-[9px] sm:text-[10px] font-bold text-yellow-300 truncate max-w-[48px]">
                       {wordData.word}
                     </span>
                   </>
@@ -356,25 +425,21 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
               </div>
             </div>
 
-            {/* Word Appraisal Banner / Info Output */}
-            <div className="mt-2 min-h-[56px] flex items-center justify-center">
-              {currentWordStr.length === 0 ? (
-                <div className="text-center text-slate-500 font-pixel text-[10px]">
-                  Place Kana into slots above to craft Japanese words!
-                </div>
-              ) : wordData ? (
+            {/* Appraisal Result Bar */}
+            <div className="mt-1 min-h-[48px] flex items-center justify-center">
+              {currentWordStr.length === 0 ? null : wordData ? (
                 <div
-                  className={`w-full p-2 border-2 flex items-center justify-between gap-2 transition-all ${
+                  className={`w-full p-2 border-2 flex items-center justify-between gap-2 transition-all rounded ${
                     isTargetWord
                       ? 'bg-emerald-950/90 border-emerald-400 text-emerald-200 shadow-[0_0_14px_rgba(52,211,153,0.3)]'
                       : 'bg-indigo-950/80 border-indigo-400 text-indigo-200'
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-2xl shrink-0">{wordData.icon}</span>
+                    <span className="text-xl shrink-0">{wordData.icon}</span>
                     <div className="min-w-0">
                       <div className="flex items-baseline gap-1.5 flex-wrap">
-                        <span className="font-kana text-sm sm:text-base font-bold text-yellow-300">
+                        <span className="font-kana text-sm font-bold text-yellow-300">
                           {wordData.word}
                         </span>
                         {wordData.kanji && (
@@ -382,18 +447,17 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                             ({wordData.kanji})
                           </span>
                         )}
-                        <span className="font-mono text-[10px] text-cyan-300 font-bold">
+                        <span className="font-mono text-[9px] text-cyan-300 font-bold">
                           [{wordData.romaji}]
                         </span>
                         <button
                           onClick={() => sounds.speakJapanese(wordData.word)}
-                          title="Listen pronunciation"
-                          className="px-1.5 py-0.2 bg-indigo-900 hover:bg-indigo-800 text-yellow-300 border border-yellow-400/60 rounded text-[10px] cursor-pointer ml-1"
+                          className="px-1.5 py-0.5 bg-indigo-900 hover:bg-indigo-800 text-yellow-300 border border-yellow-400/60 rounded text-[9px] cursor-pointer ml-1"
                         >
                           🔊
                         </button>
                       </div>
-                      <div className="text-[10px] font-semibold text-white truncate">
+                      <div className="text-[9px] font-semibold text-white truncate">
                         Meaning: {wordData.meaning} ({wordData.type})
                       </div>
                     </div>
@@ -412,10 +476,9 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   </div>
                 </div>
               ) : (
-                <div className="w-full p-2 bg-rose-950/40 border-2 border-rose-800 text-rose-300 flex items-center justify-center gap-2 text-center">
-                  <span className="text-sm">❓</span>
-                  <span className="font-pixel text-[10px]">
-                    "{currentWordStr}" is not in dictionary. Keep experimenting!
+                <div className="w-full p-1.5 bg-rose-950/40 border border-rose-800 text-rose-300 flex items-center justify-center gap-1.5 text-center rounded">
+                  <span className="font-pixel text-[9px]">
+                    ❓ "{currentWordStr}" (No match)
                   </span>
                 </div>
               )}
@@ -423,26 +486,20 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
           </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* MIDDLE SECTION: 2 ROWS FOR COLLECTED KANA                 */}
-        {/* ========================================================= */}
-        <div className="flex flex-col gap-1.5 bg-slate-950/90 border-2 border-slate-700 p-2.5 sm:p-3 rounded-xs shadow-inner">
+        {/* MIDDLE SECTION: COLLECTED KANA */}
+        <div className="flex flex-col gap-1 bg-slate-950/90 border-2 border-slate-700 p-2 sm:p-3 rounded shadow-inner">
           <div className="flex justify-between items-center border-b border-slate-800 pb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="font-pixel text-[10px] sm:text-xs text-cyan-300 font-bold">
-                COLLECTED KANA ({inventory.length})
-              </span>
-              <span className="text-[9px] text-slate-500 font-pixel">
-                [2 ROWS INVENTORY]
-              </span>
-            </div>
-            <span className="text-[8px] sm:text-[9px] text-slate-400 font-pixel">
-              Tap or drag to slot
+            <span className="font-pixel text-[10px] sm:text-xs text-cyan-300 font-bold">
+              COLLECTED KANA ({inventory.length})
             </span>
+            {hoveredKana && (
+              <span className="text-[9px] font-mono text-yellow-300">
+                {hoveredKana.character} [{hoveredKana.romaji}] • {hoveredKana.script}
+              </span>
+            )}
           </div>
 
-          {/* 2 Rows Grid of Kana Slots */}
-          <div className="grid grid-cols-7 sm:grid-cols-8 md:grid-cols-8 gap-1.5 sm:gap-2 pt-1">
+          <div className="grid grid-cols-4 min-[420px]:grid-cols-6 sm:grid-cols-8 md:grid-cols-8 gap-1.5 pt-1">
             {kanaSlots.map((item, idx) => {
               if (item) {
                 return (
@@ -453,8 +510,7 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                     onClick={() => handleKanaClick(item)}
                     onMouseEnter={() => setHoveredKana(item)}
                     onMouseLeave={() => setHoveredKana(null)}
-                    className="h-12 sm:h-14 bg-indigo-950/90 hover:bg-indigo-900 border-2 border-indigo-500/80 hover:border-yellow-400 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all hover:scale-105 active:scale-95 shadow-md group relative select-none"
-                    title={`Add "${item.character}" (${item.romaji}) to Word Builder`}
+                    className="h-11 sm:h-13 bg-indigo-950/90 hover:bg-indigo-900 border-2 border-indigo-500/80 hover:border-yellow-400 flex flex-col items-center justify-center cursor-grab active:cursor-grabbing transition-all hover:scale-105 active:scale-95 shadow-md group relative select-none rounded"
                   >
                     <span className="font-kana text-lg sm:text-xl font-bold text-yellow-300 group-hover:text-yellow-200">
                       {item.character}
@@ -468,57 +524,31 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                   </div>
                 );
               }
-              // Empty Minecraft Inventory Slot
               return (
                 <div
                   key={`empty-kana-${idx}`}
-                  className="h-12 sm:h-14 bg-[#0a0915] border-2 border-slate-800/80 flex items-center justify-center shadow-inner"
-                >
-                  <span className="font-pixel text-[7px] text-slate-700">#{idx + 1}</span>
-                </div>
+                  className="h-11 sm:h-13 bg-[#0a0915] border border-slate-800 flex items-center justify-center shadow-inner rounded opacity-50"
+                />
               );
             })}
           </div>
-
-          {/* Hover Detail Line */}
-          <div className="h-4 text-[9px] sm:text-[10px] text-slate-400 font-mono flex items-center gap-2 pt-0.5">
-            {hoveredKana ? (
-              <>
-                <span className="text-yellow-400 font-bold">{hoveredKana.character}</span>
-                <span>• Script: {hoveredKana.script}</span>
-                <span>• Romaji: [{hoveredKana.romaji}]</span>
-                <span className="text-slate-500 hidden sm:inline">(Tap to add to Crafter)</span>
-              </>
-            ) : (
-              <span className="text-slate-600 text-[8px] sm:text-[9px]">Tap character to add to builder & pronounce</span>
-            )}
-          </div>
         </div>
 
-        {/* ========================================================= */}
-        {/* BOTTOM SECTION: 2 ROWS FOR COLLECTED COLLECTIBLES / WORDS */}
-        {/* ========================================================= */}
-        <div className="flex flex-col gap-1.5 bg-slate-950/90 border-2 border-slate-700 p-2.5 sm:p-3 rounded-xs shadow-inner">
+        {/* BOTTOM SECTION: COLLECTIBLES & DISCOVERIES WITH ROOM CODING & RARITY TIERS */}
+        <div className="flex flex-col gap-1 bg-slate-950/90 border-2 border-slate-700 p-2 sm:p-3 rounded shadow-inner">
           <div className="flex justify-between items-center border-b border-slate-800 pb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="font-pixel text-[10px] sm:text-xs text-amber-400 font-bold">
-                COLLECTED COLLECTIBLES ({craftedWords.length})
-              </span>
-              <span className="text-[9px] text-slate-500 font-pixel">
-                [2 ROWS CRAFTED DISCOVERIES]
-              </span>
-            </div>
-            <span className="text-[8px] sm:text-[9px] text-slate-400 font-pixel">
-              Click word to listen 🔊
+            <span className="font-pixel text-[10px] sm:text-xs text-amber-400 font-bold">
+              COLLECTIBLES ({craftedWords.length})
             </span>
           </div>
 
-          {/* 2 Rows Grid of Discovered Word Collectibles */}
-          <div className="grid grid-cols-6 sm:grid-cols-7 md:grid-cols-8 gap-1.5 sm:gap-2 pt-1">
+          <div className="grid grid-cols-4 min-[420px]:grid-cols-5 sm:grid-cols-7 md:grid-cols-8 gap-1.5 pt-1">
             {collectibleSlots.map((wordStr, idx) => {
               if (wordStr) {
                 const info = lookupJapaneseWord(wordStr);
                 const isTarget = wordStr === currentRoom.targetWord;
+                const rarityData = getWordRarityAndRoom(wordStr);
+
                 return (
                   <div
                     key={`col-${wordStr}-${idx}`}
@@ -527,72 +557,73 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
                       sounds.speakJapanese(wordStr);
                       setSelectedWord(wordStr);
                     }}
-                    className={`h-12 sm:h-14 border-2 flex flex-col items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-md p-0.5 text-center ${
-                      isTarget
-                        ? 'bg-amber-950/80 border-amber-400 hover:border-yellow-200 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
-                        : 'bg-indigo-950/70 border-indigo-500/80 hover:border-indigo-300'
-                    }`}
-                    title={`"${wordStr}": ${info?.meaning || 'Discovered'} - Tap to hear 🔊`}
+                    className={`h-13 sm:h-15 border-2 flex flex-col items-center justify-between cursor-pointer transition-all hover:scale-105 active:scale-95 p-1 text-center rounded relative overflow-hidden ${rarityData.bgClass} ${rarityData.borderClass} ${rarityData.glowClass}`}
                   >
+                    {/* Top Room & Rarity Indicator */}
+                    <div className="w-full flex justify-between items-center text-[7px] font-mono leading-none">
+                      <span className="text-cyan-300 font-bold">{rarityData.room}</span>
+                      {isTarget ? (
+                        <span className="text-yellow-400 font-bold">★ KEY</span>
+                      ) : (
+                        <span className={rarityData.textClass}>{rarityData.label}</span>
+                      )}
+                    </div>
+
                     <span className="text-base sm:text-lg leading-none">{info?.icon || '📜'}</span>
+
                     <span className="font-kana text-[9px] sm:text-[10px] font-bold text-yellow-300 truncate max-w-full">
                       {wordStr}
                     </span>
+
                     <span className="font-mono text-[7px] text-slate-300 truncate max-w-full">
                       {info?.romaji || ''}
                     </span>
                   </div>
                 );
               }
-              // Empty / Locked Mystery Collectible Slot
               return (
                 <div
                   key={`empty-col-${idx}`}
-                  className="h-12 sm:h-14 bg-[#0a0915] border-2 border-slate-800/80 flex flex-col items-center justify-center shadow-inner opacity-70"
-                  title="Undiscovered Word! Experiment with Kana in Word Builder to unlock."
+                  className="h-13 sm:h-15 bg-[#0a0915] border border-slate-800/80 flex items-center justify-center shadow-inner opacity-40 rounded"
                 >
-                  <span className="text-xs text-slate-600 font-pixel">?</span>
-                  <span className="text-[7px] text-slate-700 font-pixel">LOCKED</span>
+                  <span className="text-xs text-slate-700 font-pixel">?</span>
                 </div>
               );
             })}
           </div>
 
           {/* Selected Collectible Details */}
-          <div className="h-4 text-[9px] sm:text-[10px] text-slate-400 font-mono flex items-center gap-2 pt-0.5">
-            {selectedWord ? (
-              (() => {
+          {selectedWord && (
+            <div className="text-[9px] sm:text-[10px] text-slate-300 font-mono flex items-center gap-2 pt-1 border-t border-slate-800/80 flex-wrap">
+              {(() => {
                 const info = lookupJapaneseWord(selectedWord);
+                const rarityData = getWordRarityAndRoom(selectedWord);
                 return (
                   <>
                     <span className="text-yellow-400 font-bold">{selectedWord}</span>
                     {info?.kanji && <span>({info.kanji})</span>}
                     <span className="text-cyan-300">[{info?.romaji}]</span>
-                    <span className="text-white">• {info?.meaning || 'Discovered Japanese word'}</span>
+                    <span>• {info?.meaning}</span>
+                    <span className={`px-1.5 py-0.2 border text-[8px] rounded font-bold ${rarityData.badgeClass}`}>
+                      {rarityData.room} • {rarityData.label}
+                    </span>
                     <button
                       onClick={() => sounds.speakJapanese(selectedWord)}
                       className="text-xs cursor-pointer text-yellow-300 hover:scale-110 ml-1"
-                      title="Replay pronunciation"
                     >
                       🔊
                     </button>
                   </>
                 );
-              })()
-            ) : (
-              <span className="text-slate-600 text-[8px] sm:text-[9px]">
-                {craftedWords.length > 0
-                  ? 'Click any collected word to hear pronunciation and review its definition'
-                  : 'Experiment with your collected Kana in the Word Builder to discover words!'}
-              </span>
-            )}
-          </div>
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Footer info */}
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-1 text-[8px] sm:text-[9px] font-pixel text-slate-500 pt-1 border-t border-slate-800 text-center sm:text-left">
-          <span className="text-amber-400/80">Chamber Goal: {currentRoom.targetMeaning} ({currentRoom.targetIcon} {currentRoom.targetWord})</span>
-          <span>Press [I] or [ESC] to return to room</span>
+        <div className="flex justify-between items-center text-[8px] sm:text-[9px] font-pixel text-slate-500 pt-1 border-t border-slate-800">
+          <span className="text-amber-400/80">Goal: {currentRoom.targetMeaning} ({currentRoom.targetIcon} {currentRoom.targetWord})</span>
+          <span>[ESC] to return</span>
         </div>
       </div>
     </div>
