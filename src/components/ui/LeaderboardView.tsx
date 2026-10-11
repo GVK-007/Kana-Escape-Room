@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   LeaderboardEntry,
+  LeaderboardCategory,
+  sortLeaderboard,
+  getEntryArtifactCount,
   formatTime,
   clearLeaderboard,
   fetchLeaderboardAsync,
@@ -15,15 +18,22 @@ interface LeaderboardViewProps {
   entries: LeaderboardEntry[];
   highlightId?: string;
   onRefresh?: (newEntries: LeaderboardEntry[]) => void;
+  initialCategory?: LeaderboardCategory;
 }
 
 export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   entries,
   highlightId,
   onRefresh,
+  initialCategory = 'time',
 }) => {
+  const [category, setCategory] = useState<LeaderboardCategory>(initialCategory);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [inspectingRun, setInspectingRun] = useState<{ entry: LeaderboardEntry; rank: number } | null>(null);
+  const [inspectingRun, setInspectingRun] = useState<{
+    entry: LeaderboardEntry;
+    rank: number;
+    category: LeaderboardCategory;
+  } | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncSuccess, setSyncSuccess] = useState<boolean | null>(null);
 
@@ -140,8 +150,65 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     if (onRefresh) onRefresh(fresh);
   };
 
+  const sortedEntries = useMemo(() => {
+    return sortLeaderboard(entries, category);
+  }, [entries, category]);
+
   return (
     <div className="w-full flex flex-col items-center">
+      {/* Category Tabs: Shortest Time vs Most Artifacts */}
+      <div className="w-full grid grid-cols-2 gap-2 mb-2 select-none">
+        <button
+          onClick={() => {
+            sounds.playSelect();
+            setCategory('time');
+          }}
+          className={`py-2 px-2 font-pixel text-[10px] sm:text-xs flex items-center justify-center gap-1.5 border-2 cursor-pointer transition-all ${
+            category === 'time'
+              ? 'bg-amber-950/80 border-yellow-400 text-yellow-300 font-bold shadow-[0_0_12px_rgba(250,204,21,0.3)]'
+              : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
+          }`}
+        >
+          <span className="text-sm">⚡</span>
+          <span>SHORTEST TIME</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sounds.playSelect();
+            setCategory('artifacts');
+          }}
+          className={`py-2 px-2 font-pixel text-[10px] sm:text-xs flex items-center justify-center gap-1.5 border-2 cursor-pointer transition-all ${
+            category === 'artifacts'
+              ? 'bg-amber-950/80 border-yellow-400 text-yellow-300 font-bold shadow-[0_0_12px_rgba(250,204,21,0.3)]'
+              : 'bg-slate-900/80 border-slate-700 text-slate-400 hover:text-white hover:border-slate-500'
+          }`}
+        >
+          <span className="text-sm">🏺</span>
+          <span>MOST ARTIFACTS</span>
+        </button>
+      </div>
+
+      {/* Category Criteria & Info */}
+      <div className="w-full flex items-center justify-between mb-2 px-1 text-[8px] sm:text-[9px] font-pixel text-slate-400">
+        <span className="text-yellow-400/90 flex items-center gap-1">
+          {category === 'time' ? (
+            <>
+              <span className="text-yellow-300">⚡</span>
+              <span>FASTEST ESCAPES — Ranked by shortest completion time</span>
+            </>
+          ) : (
+            <>
+              <span className="text-amber-300">🏺</span>
+              <span>MASTER COLLECTORS — Ranked by most word artifacts discovered</span>
+            </>
+          )}
+        </span>
+        <span className="text-slate-500 font-mono">
+          {sortedEntries.length} RUN{sortedEntries.length === 1 ? '' : 'S'}
+        </span>
+      </div>
+
       {/* Live Cloud Status Header & Admin Toggle */}
       <div className="w-full flex justify-between items-center mb-2 px-1 text-[9px] font-pixel gap-2">
         <div className="flex items-center gap-1.5 min-w-0">
@@ -207,27 +274,44 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         {/* Table Header */}
         <div className="grid grid-cols-12 bg-slate-900 border-b border-slate-800 text-[9px] sm:text-[10px] font-pixel text-amber-400 py-2 px-2 text-center">
           <span className="col-span-2 text-left">RANK</span>
-          <span className="col-span-4 text-left">RUN NAME</span>
-          <span className="col-span-2 text-center">CHAR</span>
-          <span className="col-span-2 text-center">KANA</span>
-          <span className="col-span-2 text-right">{adminKey ? 'ACTIONS' : 'TIME'}</span>
+          <span className="col-span-4 text-left">RUN / EXPLORER</span>
+          <span
+            className={`col-span-2 text-center transition-colors ${
+              category === 'artifacts' ? 'text-yellow-300 font-bold' : 'text-slate-400'
+            }`}
+          >
+            🏺 ARTS
+          </span>
+          <span className="col-span-2 text-center text-slate-400">🔤 KANA</span>
+          <span
+            className={`col-span-2 text-right transition-colors ${
+              category === 'time' ? 'text-yellow-300 font-bold' : 'text-slate-400'
+            }`}
+          >
+            {adminKey ? 'ACTIONS' : category === 'time' ? '⚡ TIME' : '⏱️ TIME'}
+          </span>
         </div>
 
         {/* Entries List */}
         <div className="max-h-60 sm:max-h-68 overflow-y-auto divide-y divide-slate-900/80 font-pixel">
-          {entries.length === 0 ? (
+          {sortedEntries.length === 0 ? (
             <div className="p-8 text-center flex flex-col items-center gap-2">
-              <span className="text-2xl">📜</span>
-              <span className="font-pixel text-xs text-yellow-300">NO RUNS RECORDED YET</span>
+              <span className="text-2xl">{category === 'artifacts' ? '🏺' : '⚡'}</span>
+              <span className="font-pixel text-xs text-yellow-300">
+                {category === 'artifacts' ? 'NO ARTIFACT RECORDS YET' : 'NO SPEED RECORDS YET'}
+              </span>
               <span className="font-pixel text-[9px] text-slate-400 max-w-xs">
-                Escape through the exit door and name your run to establish your records!
+                {category === 'artifacts'
+                  ? 'Discover and craft words in the escape rooms to establish artifact records!'
+                  : 'Escape through the exit door and name your run to establish your speed records!'}
               </span>
             </div>
           ) : (
-            entries.map((entry, idx) => {
+            sortedEntries.map((entry, idx) => {
               const rank = idx + 1;
               const isHighlight = entry.id === highlightId;
               const displayName = entry.runName || entry.playerName || `Run #${rank}`;
+              const artCount = getEntryArtifactCount(entry);
 
               const medal =
                 rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
@@ -237,7 +321,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   key={entry.id}
                   onClick={() => {
                     sounds.playSelect();
-                    setInspectingRun({ entry, rank });
+                    setInspectingRun({ entry, rank, category });
                   }}
                   title="Click to view run summary and created words"
                   className={`grid grid-cols-12 items-center text-[10px] sm:text-xs py-2 px-2 transition-all cursor-pointer select-none group ${
@@ -257,21 +341,35 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     <span className="text-xs sm:text-sm">{medal}</span>
                   </div>
 
-                  {/* Run Name */}
-                  <div className="col-span-4 text-left truncate flex items-center gap-1">
-                    <span className="tracking-wide group-hover:underline" title={displayName}>
-                      {displayName}
-                    </span>
-                    {isHighlight && (
-                      <span className="text-[7px] bg-yellow-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
-                        NEW
+                  {/* Run Name & Explorer */}
+                  <div className="col-span-4 text-left truncate flex flex-col justify-center pr-1">
+                    <div className="flex items-center gap-1 truncate">
+                      <span className="tracking-wide group-hover:underline truncate" title={displayName}>
+                        {displayName}
                       </span>
-                    )}
+                      {isHighlight && (
+                        <span className="text-[7px] bg-yellow-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
+                          NEW
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[8px] text-cyan-300/80 truncate">
+                      {entry.characterName}
+                    </span>
                   </div>
 
-                  {/* Character */}
-                  <div className="col-span-2 text-center truncate text-[9px] text-cyan-300">
-                    {entry.characterName}
+                  {/* Artifacts Count */}
+                  <div className="col-span-2 text-center">
+                    {category === 'artifacts' ? (
+                      <span className="font-bold text-yellow-300 bg-amber-950/70 border border-amber-500/40 px-1.5 py-0.5 rounded-xs text-[9px] sm:text-[10px] inline-flex items-center gap-0.5">
+                        <span>🏺</span>
+                        <span>{artCount}</span>
+                      </span>
+                    ) : (
+                      <span className="text-amber-200/80 text-[10px] font-mono">
+                        🏺 {artCount}
+                      </span>
+                    )}
                   </div>
 
                   {/* Kana Count */}
@@ -280,8 +378,16 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   </div>
 
                   {/* Escape Time / Admin Delete Button */}
-                  <div className="col-span-2 text-right font-mono font-bold text-yellow-300 flex items-center justify-end gap-1">
-                    <span>{formatTime(entry.playtimeSeconds)}</span>
+                  <div className="col-span-2 text-right font-mono flex items-center justify-end gap-1">
+                    <span
+                      className={
+                        category === 'time'
+                          ? 'font-bold text-yellow-300'
+                          : 'text-slate-300 text-[10px]'
+                      }
+                    >
+                      {formatTime(entry.playtimeSeconds)}
+                    </span>
                     {adminKey ? (
                       <button
                         onClick={(e) => {
@@ -472,6 +578,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         <RunDetailsModal
           entry={inspectingRun.entry}
           rank={inspectingRun.rank}
+          category={inspectingRun.category}
           onClose={() => setInspectingRun(null)}
         />
       )}

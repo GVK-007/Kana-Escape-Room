@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { GameSaveState } from '../../types/game';
 import { sounds } from '../../utils/audio';
 import { SaveTransferModal } from './SaveTransferModal';
+import { LeaderboardModal } from './LeaderboardModal';
 
 interface PauseMenuProps {
   volumeEnabled: boolean;
@@ -23,6 +24,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
   const [showControls, setShowControls] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [showSaveTransfer, setShowSaveTransfer] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const [ambientOn, setAmbientOn] = useState(sounds.isAmbientEnabled());
   const [ambientVol, setAmbientVol] = useState(Math.round(sounds.getAmbientVolume() * 100));
@@ -196,6 +198,17 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
             <button
               onClick={() => {
                 sounds.playSelect();
+                setShowLeaderboard(true);
+              }}
+              className="w-full py-2 bg-indigo-950/80 hover:bg-indigo-900 text-amber-300 font-pixel text-xs border-2 border-amber-500/70 cursor-pointer active:translate-y-0.5 flex justify-center items-center gap-2 shadow-sm"
+            >
+              <span>🏆</span>
+              <span>LEADERBOARDS</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playSelect();
                 setShowAudioSettings(true);
               }}
               className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 font-pixel text-xs border-2 border-cyan-600 cursor-pointer active:translate-y-0.5 flex justify-center items-center gap-2"
@@ -243,6 +256,10 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
               if (onSaveImported) onSaveImported(data);
             }}
           />
+        )}
+
+        {showLeaderboard && (
+          <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
         )}
       </div>
     </div>

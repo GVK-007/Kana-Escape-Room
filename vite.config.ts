@@ -50,7 +50,7 @@ function localLeaderboardPlugin(): Plugin {
                   }
                   return b.timestamp - a.timestamp;
                 });
-                memoryLeaderboard = memoryLeaderboard.slice(0, 50);
+                memoryLeaderboard = memoryLeaderboard.slice(0, 100);
               }
               res.statusCode = 200;
               res.end(JSON.stringify({ success: true, allEntries: memoryLeaderboard }));

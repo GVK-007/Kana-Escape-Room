@@ -92,7 +92,7 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
     }
   });
 
-  const merged = sortLeaderboard(Array.from(map.values())).slice(0, 50);
+  const merged = sortLeaderboard(Array.from(map.values()), 'time').slice(0, 100);
 
   try {
     localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(merged));
@@ -103,17 +103,52 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
   return merged;
 };
 
-export const sortLeaderboard = (entries: LeaderboardEntry[]): LeaderboardEntry[] => {
+export type LeaderboardCategory = 'time' | 'artifacts';
+
+export const getEntryArtifactCount = (entry: LeaderboardEntry): number => {
+  return Array.isArray(entry.craftedWords) ? entry.craftedWords.length : 0;
+};
+
+export const sortLeaderboard = (
+  entries: LeaderboardEntry[],
+  category: LeaderboardCategory = 'time'
+): LeaderboardEntry[] => {
   return [...entries].sort((a, b) => {
-    // Primary sort: fastest escape time (lowest seconds)
+    if (category === 'artifacts') {
+      const artA = getEntryArtifactCount(a);
+      const artB = getEntryArtifactCount(b);
+      // Primary: most artifacts/words created
+      if (artA !== artB) {
+        return artB - artA;
+      }
+      // Secondary: fastest escape time
+      if (a.playtimeSeconds !== b.playtimeSeconds) {
+        return a.playtimeSeconds - b.playtimeSeconds;
+      }
+      // Tertiary: most kana discovered
+      if ((a.totalKana || 0) !== (b.totalKana || 0)) {
+        return (b.totalKana || 0) - (a.totalKana || 0);
+      }
+      // Quaternary: most recent
+      return b.timestamp - a.timestamp;
+    }
+
+    // Default 'time' (Fastest Escape):
+    // Primary: fastest escape time
     if (a.playtimeSeconds !== b.playtimeSeconds) {
       return a.playtimeSeconds - b.playtimeSeconds;
     }
-    // Secondary sort: most Kana discovered
-    if (a.totalKana !== b.totalKana) {
-      return b.totalKana - a.totalKana;
+    // Secondary: most artifacts/words created
+    const artA = getEntryArtifactCount(a);
+    const artB = getEntryArtifactCount(b);
+    if (artA !== artB) {
+      return artB - artA;
     }
-    // Tertiary: most recent
+    // Tertiary: most Kana discovered
+    if ((a.totalKana || 0) !== (b.totalKana || 0)) {
+      return (b.totalKana || 0) - (a.totalKana || 0);
+    }
+    // Quaternary: most recent
     return b.timestamp - a.timestamp;
   });
 };
@@ -125,7 +160,13 @@ export const saveLeaderboardEntry = (params: {
   characterId: CharacterId;
   roomsCleared?: number;
   craftedWords?: string[];
-}): { entry: LeaderboardEntry; rank: number; allEntries: LeaderboardEntry[] } => {
+}): {
+  entry: LeaderboardEntry;
+  rank: number;
+  timeRank: number;
+  artifactsRank: number;
+  allEntries: LeaderboardEntry[];
+} => {
   const current = getLeaderboard();
   const char = CHARACTERS.find((c) => c.id === params.characterId);
   const characterName = char?.name || 'Explorer';
@@ -150,7 +191,8 @@ export const saveLeaderboardEntry = (params: {
     formattedDate,
   };
 
-  const updated = sortLeaderboard([...current, newEntry]).slice(0, 50);
+  const combined = [...current.filter((e) => e.id !== newEntry.id), newEntry];
+  const updated = sortLeaderboard(combined, 'time').slice(0, 100);
 
   try {
     localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(updated));
@@ -176,9 +218,19 @@ export const saveLeaderboardEntry = (params: {
     });
   }
 
-  const rank = updated.findIndex((e) => e.id === newEntry.id) + 1;
+  const timeSorted = sortLeaderboard(updated, 'time');
+  const artifactsSorted = sortLeaderboard(updated, 'artifacts');
 
-  return { entry: newEntry, rank: rank > 0 ? rank : updated.length, allEntries: updated };
+  const timeRank = timeSorted.findIndex((e) => e.id === newEntry.id) + 1;
+  const artifactsRank = artifactsSorted.findIndex((e) => e.id === newEntry.id) + 1;
+
+  return {
+    entry: newEntry,
+    rank: timeRank > 0 ? timeRank : updated.length,
+    timeRank: timeRank > 0 ? timeRank : updated.length,
+    artifactsRank: artifactsRank > 0 ? artifactsRank : updated.length,
+    allEntries: updated,
+  };
 };
 
 export const clearLeaderboard = (): LeaderboardEntry[] => {

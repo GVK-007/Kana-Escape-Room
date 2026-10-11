@@ -145,7 +145,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         }
         return b.timestamp - a.timestamp;
       })
-      .slice(0, 50);
+      .slice(0, 100);
 
     memoryLeaderboard = allEntries;
 

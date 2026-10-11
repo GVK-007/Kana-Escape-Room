@@ -7,6 +7,7 @@ import {
   getLeaderboard,
   saveLeaderboardEntry,
   fetchLeaderboardAsync,
+  sortLeaderboard,
   LeaderboardEntry,
   formatTime,
 } from '../../utils/leaderboard';
@@ -35,7 +36,7 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
   const defaultSuggestedName = `Run #${leaderboardEntries.length + 1}`;
   const [runName, setRunName] = useState(defaultSuggestedName);
   const [submitted, setSubmitted] = useState(false);
-  const [currentRank, setCurrentRank] = useState<number | null>(null);
+  const [ranks, setRanks] = useState<{ time: number; artifacts: number } | null>(null);
   const [highlightId, setHighlightId] = useState<string | undefined>(undefined);
   const [viewMode, setViewMode] = useState<'SUMMARY' | 'LEADERBOARD'>('SUMMARY');
 
@@ -101,7 +102,7 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
 
     sounds.playKanaObtained();
     setSubmitted(true);
-    setCurrentRank(res.rank);
+    setRanks({ time: res.timeRank, artifacts: res.artifactsRank });
     setHighlightId(res.entry.id);
     setLeaderboardEntries(res.allEntries);
     setViewMode('LEADERBOARD');
@@ -117,8 +118,13 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
     fetchLeaderboardAsync().then((fresh) => {
       if (fresh && fresh.length > 0) {
         setLeaderboardEntries(fresh);
-        const newRank = fresh.findIndex((r) => r.id === res.entry.id) + 1;
-        if (newRank > 0) setCurrentRank(newRank);
+        const timeSorted = sortLeaderboard(fresh, 'time');
+        const artSorted = sortLeaderboard(fresh, 'artifacts');
+        const newTimeRank = timeSorted.findIndex((r) => r.id === res.entry.id) + 1;
+        const newArtRank = artSorted.findIndex((r) => r.id === res.entry.id) + 1;
+        if (newTimeRank > 0 && newArtRank > 0) {
+          setRanks({ time: newTimeRank, artifacts: newArtRank });
+        }
       }
     });
   };
@@ -162,7 +168,7 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
             }`}
           >
-            LEADERBOARD {submitted && currentRank ? `(RANK #${currentRank})` : `(${leaderboardEntries.length})`}
+            LEADERBOARDS {submitted && ranks ? `(⚡#${ranks.time} • 🏺#${ranks.artifacts})` : `(${leaderboardEntries.length})`}
           </button>
         </div>
 
@@ -285,18 +291,28 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
                 </div>
               </form>
             ) : (
-              <div className="bg-emerald-950/60 border-2 border-emerald-400 p-2.5 w-full flex flex-col items-center gap-1">
+              <div className="bg-emerald-950/60 border-2 border-emerald-400 p-2.5 w-full flex flex-col items-center gap-1.5 shadow">
                 <span className="font-pixel text-xs text-emerald-300">
-                  ✓ RUN RECORDED AS &quot;{runName}&quot; (RANK #{currentRank})
+                  ✓ RUN RECORDED AS &quot;{runName}&quot;
                 </span>
+                {ranks && (
+                  <div className="flex gap-2 text-[10px] font-pixel">
+                    <span className="text-yellow-300 bg-yellow-950/80 border border-yellow-500/50 px-2 py-0.5 rounded shadow-xs">
+                      ⚡ SPEED: #{ranks.time}
+                    </span>
+                    <span className="text-amber-300 bg-amber-950/80 border border-amber-500/50 px-2 py-0.5 rounded shadow-xs">
+                      🏺 ARTIFACTS: #{ranks.artifacts}
+                    </span>
+                  </div>
+                )}
                 <button
                   onClick={() => {
                     sounds.playSelect();
                     setViewMode('LEADERBOARD');
                   }}
-                  className="text-[10px] font-pixel text-yellow-400 underline hover:text-white cursor-pointer"
+                  className="text-[10px] font-pixel text-yellow-400 underline hover:text-white cursor-pointer mt-0.5"
                 >
-                  VIEW LEADERBOARD TABLE ➔
+                  VIEW LEADERBOARD TABLES ➔
                 </button>
               </div>
             )}
@@ -304,9 +320,14 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
         ) : (
           /* LEADERBOARD VIEW */
           <div className="w-full flex flex-col items-center gap-2">
-            {currentRank && (
-              <div className="bg-yellow-950/70 border-2 border-yellow-400 px-4 py-1.5 w-full text-center font-pixel text-xs text-yellow-300 shadow">
-                🎉 &quot;{runName}&quot; PLACED #{currentRank} ON THE RUNS LEADERBOARD!
+            {submitted && ranks && (
+              <div className="bg-yellow-950/80 border-2 border-yellow-400 px-3 py-1.5 w-full text-center font-pixel text-[11px] text-yellow-300 shadow flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-4">
+                <span>🎉 &quot;{runName}&quot; RECORDED!</span>
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-yellow-200 font-bold">⚡ Speed: #{ranks.time}</span>
+                  <span>•</span>
+                  <span className="text-amber-200 font-bold">🏺 Artifacts: #{ranks.artifacts}</span>
+                </div>
               </div>
             )}
 
