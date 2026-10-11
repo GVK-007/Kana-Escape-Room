@@ -9,6 +9,7 @@ interface GameCardMatchProps {
 interface Card {
   id: number;
   kana: string;
+  reading: string;
   romaji: string;
   color: string;
   flipped: boolean;
@@ -16,14 +17,14 @@ interface Card {
 }
 
 const KANA_PAIRS = [
-  { kana: '星', romaji: 'Star', color: 'bg-yellow-500' },
-  { kana: '月', romaji: 'Moon', color: 'bg-indigo-500' },
-  { kana: '火', romaji: 'Fire', color: 'bg-rose-500' },
-  { kana: '水', romaji: 'Water', color: 'bg-cyan-500' },
-  { kana: '木', romaji: 'Tree', color: 'bg-emerald-500' },
-  { kana: '金', romaji: 'Gold', color: 'bg-amber-400' },
-  { kana: '土', romaji: 'Earth', color: 'bg-stone-500' },
-  { kana: '日', romaji: 'Sun', color: 'bg-red-500' },
+  { kana: '星', reading: 'ほし', romaji: 'Star (Hoshi)', color: 'bg-yellow-500' },
+  { kana: '月', reading: 'つき', romaji: 'Moon (Tsuki)', color: 'bg-indigo-500' },
+  { kana: '火', reading: 'ひ', romaji: 'Fire (Hi)', color: 'bg-rose-500' },
+  { kana: '水', reading: 'みず', romaji: 'Water (Mizu)', color: 'bg-cyan-500' },
+  { kana: '木', reading: 'き', romaji: 'Tree (Ki)', color: 'bg-emerald-500' },
+  { kana: '金', reading: 'きん', romaji: 'Gold (Kin)', color: 'bg-amber-400' },
+  { kana: '土', reading: 'つち', romaji: 'Earth (Tsuchi)', color: 'bg-stone-500' },
+  { kana: '日', reading: 'ひ', romaji: 'Sun (Hi)', color: 'bg-red-500' },
 ];
 
 export const GameCardMatch: React.FC<GameCardMatchProps> = ({ onSuccess }) => {
@@ -51,7 +52,7 @@ export const GameCardMatch: React.FC<GameCardMatchProps> = ({ onSuccess }) => {
     }
 
     sounds.playBlip(540);
-    sounds.speakJapanese(cards[index].kana);
+    sounds.speakJapanese(cards[index].reading);
     const nextCards = cards.map((c, i) => (i === index ? { ...c, flipped: true } : c));
     setCards(nextCards);
 

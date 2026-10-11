@@ -147,19 +147,38 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
       const s = stateRef.current;
       const p = s.projectile;
 
-      // Update structural physics (falling blocks & targets)
+      // Update structural physics (falling blocks & cascading collapse)
       for (const b of s.blocks) {
         if (b.alive && b.supports) {
-          // If all supporting pillars are destroyed, the beam falls!
-          const activeSupports = b.supports.filter((id) =>
-            s.blocks.some((x) => x.id === id && x.alive)
-          );
-          if (activeSupports.length === 0) {
-            b.falling = true;
+          // Check if supports are alive AND not currently falling!
+          const solidSupports = b.supports.filter((id) => {
+            const suppBlock = s.blocks.find((x) => x.id === id);
+            return suppBlock && suppBlock.alive && !suppBlock.falling;
+          });
+
+          // Balanced equilibrium requirement:
+          // b1 (3 pillars): needs at least 2 adjacent solid pillars to stand
+          if (b.id === 'b1') {
+            const p1 = s.blocks.find((x) => x.id === 'p1');
+            const p2 = s.blocks.find((x) => x.id === 'p2');
+            const p3 = s.blocks.find((x) => x.id === 'p3');
+            const p1Solid = p1 && p1.alive && !p1.falling;
+            const p2Solid = p2 && p2.alive && !p2.falling;
+            const p3Solid = p3 && p3.alive && !p3.falling;
+            // If center pillar is gone, or any 2 pillars are gone: foundation gives way and collapses!
+            if ((!p1Solid && !p2Solid) || (!p2Solid && !p3Solid) || (!p1Solid && !p3Solid) || solidSupports.length <= 1) {
+              b.falling = true;
+            }
+          } else {
+            // b2, b3, p4, p5: If ANY supporting base below fails or falls, upper structure falls!
+            if (solidSupports.length < b.supports.length) {
+              b.falling = true;
+            }
           }
         }
+
         if (b.alive && b.falling) {
-          b.vy += 0.20;
+          b.vy += 0.24;
           b.y += b.vy;
           if (b.y >= 175 - b.h) {
             b.y = 175 - b.h;
@@ -170,30 +189,30 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
           for (const t of s.targets) {
             if (
               t.alive &&
-              b.x <= t.x + t.r &&
-              b.x + b.w >= t.x - t.r &&
+              b.x <= t.x + t.r + 4 &&
+              b.x + b.w >= t.x - t.r - 4 &&
               b.y + b.h >= t.y - t.r &&
-              b.y <= t.y + t.r
+              b.y <= t.y + t.r + 4
             ) {
               t.alive = false;
-              spawnParticles(t.x, t.y, '#facc15', 16, 4.0);
+              spawnParticles(t.x, t.y, '#facc15', 18, 4.2);
               sounds.playKanaObtained();
             }
           }
         }
       }
 
-      // Update supported targets falling if their base falls
+      // Update supported targets falling if their base falls or is destroyed
       for (const t of s.targets) {
         if (t.alive && t.supportedBy) {
           const sup = s.blocks.find((x) => x.id === t.supportedBy);
-          if (sup && (!sup.alive || sup.falling)) {
+          if (!sup || !sup.alive || sup.falling) {
             t.falling = true;
-            t.vy = Math.max(t.vy, sup.vy || 1.2);
+            t.vy = Math.max(t.vy, sup?.vy || 1.4);
           }
         }
         if (t.alive && t.falling) {
-          t.vy += 0.20;
+          t.vy += 0.24;
           t.y += t.vy;
           if (t.y >= 175 - t.r) {
             t.y = 175 - t.r;

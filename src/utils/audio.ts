@@ -637,6 +637,13 @@ class SoundEngine {
   }
 
   private stopCurrentSpeech() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // ignore
+      }
+    }
     if (this.currentSpeechAudio) {
       try {
         this.currentSpeechAudio.pause();
@@ -733,18 +740,29 @@ class SoundEngine {
     }
 
     try {
+      window.speechSynthesis.cancel();
+
       if (window.speechSynthesis.paused) {
         window.speechSynthesis.resume();
       }
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'ja-JP';
-      utterance.rate = 0.9;
-      utterance.volume = this.sfxVolume;
 
       const voices = window.speechSynthesis.getVoices();
       const jaVoice = voices.find(
         (v) => v.lang.toLowerCase().startsWith('ja') || v.lang.toLowerCase().includes('jp')
       );
+
+      // Prevent non-Japanese TTS voices from announcing Kanji as "Chinese letter [word]"
+      const hasKanji = /[\u4e00-\u9faf]/.test(text);
+      if (!jaVoice && hasKanji) {
+        if (onFail) onFail();
+        return false;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      utterance.rate = 0.95;
+      utterance.volume = this.sfxVolume;
+
       if (jaVoice) {
         utterance.voice = jaVoice;
       }
