@@ -71,6 +71,12 @@ export interface RoomData {
   requiredKana: string[];
   interactables: InteractableObject[];
   exitDoor: ExitDoor;
+  entranceDoor?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
   playerSpawn: { x: number; y: number };
   decorations: Array<{
     x: number;

@@ -23,6 +23,7 @@ interface GameViewportProps {
   isLocked?: boolean;
   onInteract: (obj: InteractableObject) => void;
   onInteractDoor: () => void;
+  onReturnToPrevRoom?: () => void;
   onOpenInventory: () => void;
   onOpenPauseMenu: () => void;
   onDebugUnlockDoor?: () => void;
@@ -41,6 +42,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
   isLocked = false,
   onInteract,
   onInteractDoor,
+  onReturnToPrevRoom,
   onOpenInventory,
   onOpenPauseMenu,
   onDebugUnlockDoor,
@@ -64,6 +66,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
   const [nearbyInteractable, setNearbyInteractable] = useState<InteractableObject | null>(null);
   const [isNearDoor, setIsNearDoor] = useState(false);
+  const [isNearEntrance, setIsNearEntrance] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
   const [controlType, setControlType] = useState<'joystick' | 'dpad'>('joystick');
   const [showTouchControls, setShowTouchControls] = useState(() => {
@@ -82,7 +85,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
   const handleVirtualInteract = () => {
     if (isLocked) return;
-    if (isNearDoor) {
+    if (isNearEntrance && onReturnToPrevRoom) {
+      onReturnToPrevRoom();
+    } else if (isNearDoor) {
       onInteractDoor();
     } else if (nearbyInteractable) {
       onInteract(nearbyInteractable);
@@ -106,6 +111,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       playerRef.current.frame = 0;
       setNearbyInteractable(null);
       setIsNearDoor(false);
+      setIsNearEntrance(false);
     }
   }, [isLocked]);
 
@@ -121,7 +127,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
       if (e.code === 'KeyE') {
         e.preventDefault();
-        if (isNearDoor) {
+        if (isNearEntrance && onReturnToPrevRoom) {
+          onReturnToPrevRoom();
+        } else if (isNearDoor) {
           onInteractDoor();
         } else if (nearbyInteractable) {
           onInteract(nearbyInteractable);
@@ -155,7 +163,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isLocked, isNearDoor, nearbyInteractable, onInteract, onInteractDoor, onOpenInventory, onOpenPauseMenu, onDebugGiveKana, onDebugUnlockDoor]);
+  }, [isLocked, isNearDoor, isNearEntrance, nearbyInteractable, onInteract, onInteractDoor, onReturnToPrevRoom, onOpenInventory, onOpenPauseMenu, onDebugGiveKana, onDebugUnlockDoor]);
 
   // Check collision with solid environmental objects & walls
   const isSolid = useCallback((px: number, py: number): boolean => {
@@ -438,6 +446,17 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         const nearDoorNow = distToDoor < 34;
         setIsNearDoor(nearDoorNow);
 
+        // Entrance door distance (if room has entranceDoor)
+        if (room.entranceDoor) {
+          const entranceCenterX = (room.entranceDoor.x + room.entranceDoor.width / 2) * TILE_SIZE;
+          const entranceCenterY = (room.entranceDoor.y + room.entranceDoor.height / 2) * TILE_SIZE;
+          const distToEntrance = Math.hypot(playerCenterX - entranceCenterX, playerCenterY - entranceCenterY);
+          const nearEntranceNow = distToEntrance < 34;
+          setIsNearEntrance(nearEntranceNow);
+        } else {
+          setIsNearEntrance(false);
+        }
+
         // Interactables distance
         let closestObj: InteractableObject | null = null;
         let minObjDist = Infinity;
@@ -456,6 +475,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         setNearbyInteractable(closestObj);
       } else {
         setIsNearDoor(false);
+        setIsNearEntrance(false);
         setNearbyInteractable(null);
       }
 
@@ -510,6 +530,13 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       // 2. Draw Door
       const doorSprite = getDoorSprite(isDoorUnlocked, room.exitDoor.targetIcon, room.id);
       ctx.drawImage(doorSprite, room.exitDoor.x * TILE_SIZE, (room.exitDoor.y - 1) * TILE_SIZE);
+
+      // 2b. Draw Entrance Door (Return doorway to previous chamber)
+      if (room.entranceDoor) {
+        const prevRoomId = `room-${room.number - 1}`;
+        const entranceSprite = getDoorSprite(true, '↩', prevRoomId);
+        ctx.drawImage(entranceSprite, room.entranceDoor.x * TILE_SIZE, (room.entranceDoor.y - 1) * TILE_SIZE);
+      }
 
       // 3. Y-SORTED OBJECTS & CHARACTERS
       interface RenderEntity {
@@ -685,7 +712,16 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         />
 
         {/* Floating Pixel Interaction Prompt (Only shown near object or door) */}
-        {!isLocked && isNearDoor && (
+        {!isLocked && isNearEntrance && (
+          <div className={`absolute top-3 bg-black/90 border-2 border-amber-400 ${theme.pixelBoxClass} px-3 py-1.5 flex items-center gap-1.5 animate-bounce z-20`}>
+            <span className="font-pixel text-[10px] sm:text-xs text-amber-300">
+              [E] RETURN TO ROOM {room.number - 1}
+            </span>
+            <span className="text-sm">↩</span>
+          </div>
+        )}
+
+        {!isLocked && isNearDoor && !isNearEntrance && (
           <div className={`absolute top-3 bg-black/90 border-2 ${theme.borderClass} ${theme.pixelBoxClass} px-3 py-1.5 flex items-center gap-1.5 animate-bounce z-20`}>
             <span className={`font-pixel text-[10px] sm:text-xs ${theme.accentTextClass}`}>
               {isDoorUnlocked ? '[E] OPEN DOOR' : '[E] EXAMINE DOOR'}
@@ -694,7 +730,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           </div>
         )}
 
-        {!isLocked && nearbyInteractable && !isNearDoor && (
+        {!isLocked && nearbyInteractable && !isNearDoor && !isNearEntrance && (
           <div className={`absolute top-3 bg-black/90 border-2 ${theme.borderClass} ${theme.pixelBoxClass} px-3 py-1.5 flex items-center gap-1.5 animate-bounce z-20`}>
             <span className={`font-pixel text-[10px] sm:text-xs ${theme.accentTextClass}`}>
               [E] {nearbyInteractable.name.toUpperCase()}
@@ -723,14 +759,16 @@ export const GameViewport: React.FC<GameViewportProps> = ({
               <button
                 onPointerDown={(e) => { e.preventDefault(); handleVirtualInteract(); }}
                 className={`px-3 py-2 border-2 font-pixel text-xs font-bold shadow-xl active:scale-95 flex items-center gap-1 cursor-pointer ${
-                  isNearDoor
+                  isNearEntrance
+                    ? 'bg-amber-600/95 hover:bg-amber-500 border-white text-white animate-pulse'
+                    : isNearDoor
                     ? 'bg-yellow-500/95 hover:bg-yellow-400 border-white text-black animate-pulse'
                     : nearbyInteractable
                     ? 'bg-cyan-500/95 hover:bg-cyan-400 border-white text-black animate-pulse'
                     : 'bg-slate-900/90 border-slate-600 text-slate-300'
                 }`}
               >
-                [E] {isNearDoor ? (isDoorUnlocked ? 'OPEN' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : 'ACTION'}
+                [E] {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'OPEN' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : 'ACTION'}
               </button>
               <button
                 onPointerDown={(e) => { e.preventDefault(); sounds.playSelect(); onOpenInventory(); }}
@@ -843,7 +881,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
                 handleVirtualInteract();
               }}
               className={`w-15 h-15 sm:w-17 sm:h-17 rounded-full border-3 sm:border-4 font-pixel text-xs font-bold shadow-2xl active:scale-95 flex flex-col items-center justify-center cursor-pointer transition-all ${
-                isNearDoor
+                isNearEntrance
+                  ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(245,158,11,0.85)]'
+                  : isNearDoor
                   ? 'bg-gradient-to-b from-yellow-400 to-amber-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(250,204,21,0.85)]'
                   : nearbyInteractable
                   ? 'bg-gradient-to-b from-cyan-400 to-blue-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(34,211,238,0.85)]'
@@ -853,7 +893,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
             >
               <span className="text-sm font-bold">[E]</span>
               <span className="text-[7px] tracking-tight">
-                {isNearDoor ? (isDoorUnlocked ? 'OPEN' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : 'ACTION'}
+                {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'OPEN' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : 'ACTION'}
               </span>
             </button>
           </div>

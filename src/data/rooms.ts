@@ -140,6 +140,12 @@ export const ROOMS: RoomData[] = [
     clueHint: 'An ornate Shoji sliding portal barred by a heavy wooden beam. It requires the Japanese word for "Door".',
     requiredKana: ['と', 'び', 'ら'],
     playerSpawn: { x: 12, y: 14 },
+    entranceDoor: {
+      x: 12,
+      y: 16,
+      width: 2,
+      height: 2,
+    },
     exitDoor: {
       x: 12,
       y: 2,
@@ -273,6 +279,12 @@ export const ROOMS: RoomData[] = [
     clueHint: 'A majestic sealed Vermillion Torii archway draped in sacred Shimenawa rope. Craft the Japanese word for "Exit" to escape!',
     requiredKana: ['で', 'ぐ', 'ち'],
     playerSpawn: { x: 13, y: 16 },
+    entranceDoor: {
+      x: 13,
+      y: 18,
+      width: 2,
+      height: 2,
+    },
     exitDoor: {
       x: 13,
       y: 2,

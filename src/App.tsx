@@ -354,6 +354,15 @@ export default function App() {
     setGameState('PLAYING');
   };
 
+  const handleProceedPrevRoom = () => {
+    if (currentRoomIndex <= 0) return;
+    sounds.playDoorUnlock();
+    const prevIdx = currentRoomIndex - 1;
+    setTargetNextRoomIndex(prevIdx);
+    setTransitionActive(true);
+    setGameState('PLAYING');
+  };
+
   const handleTransitionMidpoint = () => {
     if (targetNextRoomIndex !== null) {
       setCurrentRoomIndex(targetNextRoomIndex);
@@ -422,6 +431,7 @@ export default function App() {
             currentRoom={currentRoom}
             inventory={inventory}
             isDoorUnlocked={isDoorUnlocked}
+            onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
             onOpenInventory={() => {
               sounds.playSelect();
               setGameState('INVENTORY');
@@ -446,6 +456,7 @@ export default function App() {
               isLocked={gameState !== 'PLAYING'}
               onInteract={handleInteract}
               onInteractDoor={handleInteractDoor}
+              onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
               onOpenInventory={() => setGameState('INVENTORY')}
               onOpenPauseMenu={() => setGameState('PAUSED')}
               onDebugGiveKana={handleDebugGiveKana}
@@ -481,6 +492,7 @@ export default function App() {
           inventory={inventory}
           currentRoom={currentRoom}
           craftedWords={craftedWords}
+          characterId={selectedCharacter}
           isDoorUnlocked={isDoorUnlocked}
           onUnlockDoor={handleUnlockDoor}
           onWordCrafted={handleWordCrafted}

@@ -10,6 +10,7 @@ interface HUDProps {
   onOpenInventory: () => void;
   onOpenPauseMenu: () => void;
   onOpenDoorClue?: () => void;
+  onReturnToPrevRoom?: () => void;
 }
 
 export const HUD: React.FC<HUDProps> = ({
@@ -19,6 +20,7 @@ export const HUD: React.FC<HUDProps> = ({
   onOpenInventory,
   onOpenPauseMenu,
   onOpenDoorClue,
+  onReturnToPrevRoom,
 }) => {
   const theme = getRoomTheme(currentRoom.id);
 
@@ -35,6 +37,22 @@ export const HUD: React.FC<HUDProps> = ({
             {currentRoom.name}
           </span>
         </div>
+
+        {/* Return to Previous Room (Rooms 2 & 3) */}
+        {currentRoom.number > 1 && onReturnToPrevRoom && (
+          <button
+            onClick={() => {
+              sounds.playSelect();
+              onReturnToPrevRoom();
+            }}
+            title={`Return to Room ${currentRoom.number - 1}`}
+            className="flex items-center gap-1 bg-amber-950/90 hover:bg-amber-900 border border-amber-600/80 px-1.5 sm:px-2 py-1 text-amber-300 hover:text-amber-200 cursor-pointer text-[9px] sm:text-[10px] shadow-sm transition-all active:scale-95 shrink-0"
+          >
+            <span className="font-bold">←</span>
+            <span className="hidden sm:inline font-pixel">ROOM {currentRoom.number - 1}</span>
+            <span className="sm:hidden font-pixel">R{currentRoom.number - 1}</span>
+          </button>
+        )}
 
         {/* Clue Badge & Hints trigger */}
         <button

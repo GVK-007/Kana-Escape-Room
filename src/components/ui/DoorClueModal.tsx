@@ -2,7 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { ExitDoor } from '../../types/game';
 import { sounds } from '../../utils/audio';
 
-export const HINT_COOLDOWN_SECONDS = 20;
+export function getHintCooldownSeconds(revealedCount: number): number {
+  if (revealedCount <= 1) return 15;
+  if (revealedCount === 2) return 30;
+  if (revealedCount === 3) return 45;
+  return 60;
+}
 
 export interface RoomHintState {
   revealedCount: number; // 0: no hint yet, 1: word length shown (? ?), 2: 1st letter revealed, etc.
@@ -30,11 +35,12 @@ export const DoorClueModal: React.FC<DoorClueModalProps> = ({
   const revealedCount = roomHint.revealedCount;
   const allRevealed = revealedCount > letters.length;
 
-  // Live cooldown timer calculation
+  // Live cooldown timer calculation with progressive scaling
   const [cooldownRemaining, setCooldownRemaining] = useState(() => {
     if (revealedCount === 0 || allRevealed) return 0;
+    const cooldownDuration = getHintCooldownSeconds(revealedCount);
     const elapsed = Math.floor((Date.now() - roomHint.lastHintTimestamp) / 1000);
-    return Math.max(0, HINT_COOLDOWN_SECONDS - elapsed);
+    return Math.max(0, cooldownDuration - elapsed);
   });
 
   useEffect(() => {
@@ -44,8 +50,9 @@ export const DoorClueModal: React.FC<DoorClueModalProps> = ({
     }
 
     const updateTimer = () => {
+      const cooldownDuration = getHintCooldownSeconds(revealedCount);
       const elapsed = Math.floor((Date.now() - roomHint.lastHintTimestamp) / 1000);
-      const remaining = Math.max(0, HINT_COOLDOWN_SECONDS - elapsed);
+      const remaining = Math.max(0, cooldownDuration - elapsed);
       setCooldownRemaining(remaining);
     };
 
@@ -304,7 +311,7 @@ export const DoorClueModal: React.FC<DoorClueModalProps> = ({
             <div className="text-[9px] text-slate-500 font-sans text-center">
               {allRevealed
                 ? 'Craft the word in your Bag [I] to dissolve the seal.'
-                : `Hints cooldown: ${HINT_COOLDOWN_SECONDS}s between letters.`}
+                : `Progressive hint cooldown: 15s → 30s → 45s → 60s.`}
             </div>
           </div>
         </div>
