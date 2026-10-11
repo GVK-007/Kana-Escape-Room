@@ -228,7 +228,7 @@ export function getCharacterSprite(
 
     // Torso / Shirt Back
     ctx.fillStyle = pal.shirt;
-    ctx.fillRect(baseX + 4, 9 + baseY, 8, 6);
+    ctx.fillRect(baseX + 4, 8 + baseY, 8, 7);
     ctx.fillStyle = pal.shirtShadow;
     ctx.fillRect(baseX + 4, 13 + baseY, 8, 2);
 
@@ -241,6 +241,10 @@ export function getCharacterSprite(
     ctx.fillStyle = pal.skin;
     ctx.fillRect(baseX + 2, 14 + baseY + armL, 2, 2);
     ctx.fillRect(baseX + 12, 14 + baseY + armR, 2, 2);
+
+    // Back of neck collar
+    ctx.fillStyle = pal.skinShadow;
+    ctx.fillRect(baseX + 6, 7 + baseY, 4, 2);
 
     // Full Back Hair
     ctx.fillStyle = pal.hair;
@@ -289,6 +293,9 @@ export function getCharacterSprite(
     // Head
     ctx.fillStyle = pal.skin;
     ctx.fillRect(baseX + 4, 3 + baseY, 7, 6);
+    // Neck
+    ctx.fillStyle = pal.skinShadow;
+    ctx.fillRect(baseX + 6, 8 + baseY, 3, 2);
 
     // Eye Left
     ctx.fillStyle = '#111827';
@@ -343,6 +350,9 @@ export function getCharacterSprite(
     // Head
     ctx.fillStyle = pal.skin;
     ctx.fillRect(baseX + 5, 3 + baseY, 7, 6);
+    // Neck
+    ctx.fillStyle = pal.skinShadow;
+    ctx.fillRect(baseX + 7, 8 + baseY, 3, 2);
 
     // Eye Right
     ctx.fillStyle = '#111827';
@@ -472,10 +482,10 @@ export function getCharacterSprite(
 
     // Torso (3/4 back view)
     ctx.fillStyle = pal.shirt;
-    ctx.fillRect(baseX + 4, 9 + baseY, 7, 6);
+    ctx.fillRect(baseX + 4, 8 + baseY, 7, 7);
     ctx.fillStyle = pal.shirtShadow;
     ctx.fillRect(baseX + 4, 13 + baseY, 7, 2);
-    ctx.fillRect(baseX + 9, 9 + baseY, 2, 6);
+    ctx.fillRect(baseX + 9, 8 + baseY, 2, 7);
 
     // Arms
     const armL = step === 1 ? -1 : step === 3 ? 1 : 0;
@@ -490,9 +500,13 @@ export function getCharacterSprite(
     ctx.fillStyle = pal.skinShadow;
     ctx.fillRect(baseX + 11, 14 + baseY + armR, 2, 2);
 
+    // Neck / collar junction to torso
+    ctx.fillStyle = pal.skinShadow;
+    ctx.fillRect(baseX + 6, 7 + baseY, 3, 2);
+
     // Back of head & hair (angled away 3/4)
     ctx.fillStyle = pal.hair;
-    ctx.fillRect(baseX + 3, 1 + baseY, 9, 7);
+    ctx.fillRect(baseX + 3, 1 + baseY, 9, 8);
     ctx.fillStyle = pal.hairShadow;
     ctx.fillRect(baseX + 4, 5 + baseY, 8, 3);
 
@@ -1434,6 +1448,8 @@ export function getDecorationSprite(type: string, roomId: string = 'room-1'): HT
     ctx.fillRect(0, 3, 16, 1);
     ctx.fillRect(0, 12, 16, 1);
 
+  } else if (type === 'table') {
+    return getTableSprite(roomId, 2, 1.5);
   } else {
     // Japanese Wooden Storage Chest / Tansu (箪笥)
     ctx.fillStyle = '#451a03';
@@ -1446,6 +1462,118 @@ export function getDecorationSprite(type: string, roomId: string = 'room-1'): HT
     ctx.fillRect(7, 4, 2, 1);
     ctx.fillRect(7, 10, 2, 1);
   }
+
+  assetCache.set(key, canvas);
+  return canvas;
+}
+
+/**
+ * Generates an unmistakable 3D/isometric wooden display table sprite
+ * width: widthTiles * 16 (default 32px), height: heightTiles * 16 (default 24px)
+ */
+export function getTableSprite(roomId: string = 'room-1', widthTiles: number = 2, heightTiles: number = 1.5): HTMLCanvasElement {
+  const w = Math.round(widthTiles * 16);
+  const h = Math.round(heightTiles * 16);
+  const key = `table_${roomId}_${w}_${h}`;
+  if (assetCache.has(key)) return assetCache.get(key)!;
+
+  const { canvas, ctx } = createCrispCanvas(w, h);
+
+  // Palettes per chamber theme
+  let woodBase = '#78350f';
+  let woodSurface = '#b45309';
+  let woodBevel = '#f59e0b';
+  let woodShadow = '#451a03';
+  let legColor = '#572208';
+  let legHighlight = '#92400e';
+  let cornerAccent = '#94a3b8'; // steel accents in workshop
+
+  if (roomId === 'room-2') {
+    // Japanese Hinoki Cypress tea & scholar table
+    woodBase = '#854d0e';
+    woodSurface = '#ca8a04';
+    woodBevel = '#fef08a';
+    woodShadow = '#542d07';
+    legColor = '#653a09';
+    legHighlight = '#a16207';
+    cornerAccent = '#d97706';
+  } else if (roomId === 'room-3') {
+    // Sacred Vermilion & Gold Lacquer ceremonial altar table
+    woodBase = '#881337';
+    woodSurface = '#b91c1c';
+    woodBevel = '#fbbf24';
+    woodShadow = '#4c0519';
+    legColor = '#630a24';
+    legHighlight = '#991b1b';
+    cornerAccent = '#facc15';
+  }
+
+  // 1. Soft Floor Contact Shadows under table legs
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+  ctx.fillRect(2, h - 3, 5, 3);
+  ctx.fillRect(w - 7, h - 3, 5, 3);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.fillRect(4, h - 4, w - 8, 2);
+
+  // 2. Back Legs (receded in depth, shadowed)
+  ctx.fillStyle = woodShadow;
+  ctx.fillRect(3, 8, 3, h - 11);
+  ctx.fillRect(w - 6, 8, 3, h - 11);
+
+  // Back cross-stretcher bar
+  ctx.fillStyle = woodShadow;
+  ctx.fillRect(4, 13, w - 8, 2);
+
+  // 3. Front Legs (sturdy, carved, foreground perspective)
+  ctx.fillStyle = legColor;
+  ctx.fillRect(2, 9, 4, h - 11);
+  ctx.fillRect(w - 6, 9, 4, h - 11);
+  // Leg highlights on front corner
+  ctx.fillStyle = legHighlight;
+  ctx.fillRect(2, 9, 1, h - 11);
+  ctx.fillRect(w - 6, 9, 1, h - 11);
+  // Foot pads
+  ctx.fillStyle = cornerAccent;
+  ctx.fillRect(2, h - 4, 4, 2);
+  ctx.fillRect(w - 6, h - 4, 4, 2);
+
+  // Lower front stretcher rail
+  ctx.fillStyle = woodBase;
+  ctx.fillRect(5, h - 8, w - 10, 2);
+  ctx.fillStyle = woodShadow;
+  ctx.fillRect(5, h - 6, w - 10, 1);
+
+  // 4. Apron / Skirt beneath tabletop
+  ctx.fillStyle = woodShadow;
+  ctx.fillRect(2, 7, w - 4, 3);
+
+  // 5. Solid Horizontal Tabletop (Top-down 3/4 perspective)
+  // Tabletop Thickness Edge (Facing camera)
+  ctx.fillStyle = woodBase;
+  ctx.fillRect(1, 6, w - 2, 3);
+  ctx.fillStyle = woodShadow;
+  ctx.fillRect(1, 8, w - 2, 1);
+
+  // Tabletop Main Upper Surface
+  ctx.fillStyle = woodSurface;
+  ctx.fillRect(1, 1, w - 2, 6);
+
+  // Wood Grain Streaks across tabletop
+  ctx.fillStyle = woodBase;
+  ctx.fillRect(4, 3, w - 8, 1);
+  ctx.fillRect(8, 5, w - 14, 1);
+
+  // Top Bevel Rim Highlights (Polished luster)
+  ctx.fillStyle = woodBevel;
+  ctx.fillRect(1, 1, w - 2, 1);
+  ctx.fillRect(1, 2, 1, 5);
+
+  // Metal / Gold Corner Braces
+  ctx.fillStyle = cornerAccent;
+  ctx.fillRect(1, 1, 2, 2);
+  ctx.fillRect(w - 3, 1, 2, 2);
+  ctx.fillRect(1, 6, 2, 2);
+  ctx.fillRect(w - 3, 6, 2, 2);
 
   assetCache.set(key, canvas);
   return canvas;

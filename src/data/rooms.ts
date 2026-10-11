@@ -116,8 +116,8 @@ export const ROOMS: RoomData[] = [
       { x: 10, y: 8, type: 'rug', solid: false, width: 4, height: 3 },
       { x: 7, y: 2, type: 'window', solid: false, width: 2, height: 1 },
       { x: 15, y: 2, type: 'window', solid: false, width: 2, height: 1 },
-      { x: 2, y: 7, type: 'shelf', solid: true, width: 1, height: 2 },
-      { x: 19, y: 7, type: 'shelf', solid: true, width: 1, height: 2 },
+      { id: 'table_r1_1', x: 2, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
+      { id: 'table_r1_2', x: 18, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
     ]
   },
 
@@ -255,8 +255,8 @@ export const ROOMS: RoomData[] = [
       { x: 10, y: 11, type: 'rug', solid: false, width: 4, height: 3 },
       { x: 8, y: 2, type: 'window', solid: false, width: 2, height: 1 },
       { x: 16, y: 2, type: 'window', solid: false, width: 2, height: 1 },
-      { x: 2, y: 6, type: 'shelf', solid: true, width: 1, height: 3 },
-      { x: 21, y: 6, type: 'shelf', solid: true, width: 1, height: 3 },
+      { id: 'table_r2_1', x: 2, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
+      { id: 'table_r2_2', x: 20, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
     ]
   },
 
@@ -394,8 +394,8 @@ export const ROOMS: RoomData[] = [
       { x: 11, y: 12, type: 'rug', solid: false, width: 4, height: 3 },
       { x: 8, y: 2, type: 'window', solid: false, width: 2, height: 1 },
       { x: 18, y: 2, type: 'window', solid: false, width: 2, height: 1 },
-      { x: 2, y: 7, type: 'shelf', solid: true, width: 1, height: 3 },
-      { x: 23, y: 7, type: 'shelf', solid: true, width: 1, height: 3 },
+      { id: 'table_r3_1', x: 2, y: 8, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
+      { id: 'table_r3_2', x: 21, y: 8, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
     ]
   }
 ];

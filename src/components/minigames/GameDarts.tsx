@@ -81,10 +81,10 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
 
   const lastActionTimeRef = useRef(0);
 
-  // Immediate input action - with 250ms debounce to prevent touch double-triggering
+  // Immediate input action - with 400ms debounce to prevent touch double-triggering
   const triggerPlayerAction = () => {
     const now = performance.now();
-    if (now - lastActionTimeRef.current < 250) return;
+    if (now - lastActionTimeRef.current < 400) return;
     lastActionTimeRef.current = now;
 
     const s = stateRef.current;

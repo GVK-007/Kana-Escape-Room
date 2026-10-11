@@ -77,6 +77,7 @@ export function importSaveData(jsonString: string): { success: boolean; data?: G
       playtimeSeconds: typeof parsed.playtimeSeconds === 'number' ? parsed.playtimeSeconds : 0,
       volumeEnabled: parsed.volumeEnabled !== false,
       shuffledRewards: parsed.shuffledRewards && typeof parsed.shuffledRewards === 'object' ? parsed.shuffledRewards : undefined,
+      displayedItems: parsed.displayedItems && typeof parsed.displayedItems === 'object' ? parsed.displayedItems : undefined,
     };
 
     localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(validated));

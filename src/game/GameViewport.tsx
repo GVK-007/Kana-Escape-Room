@@ -8,7 +8,9 @@ import {
   getDoorSprite,
   getInteractableSprite,
   getDecorationSprite,
+  getTableSprite,
 } from '../utils/pixelArt';
+import { JAPANESE_DICTIONARY } from '../data/dictionary';
 import { sounds } from '../utils/audio';
 import { AtmosphericSystem } from './AtmosphericEffects';
 import { useDeviceMode } from '../utils/useDeviceMode';
@@ -28,6 +30,9 @@ interface GameViewportProps {
   onOpenPauseMenu: () => void;
   onDebugUnlockDoor?: () => void;
   onDebugGiveKana?: () => void;
+  displayedItems?: Record<string, string[]>;
+  onInteractTable?: (tableId: string) => void;
+  spawnDirection?: 'forward' | 'backward';
 }
 
 const TILE_SIZE = 16;
@@ -47,6 +52,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
   onOpenPauseMenu,
   onDebugUnlockDoor,
   onDebugGiveKana,
+  displayedItems,
+  onInteractTable,
+  spawnDirection = 'forward',
 }) => {
   const device = useDeviceMode();
   const theme = getRoomTheme(room.id);
@@ -65,10 +73,11 @@ export const GameViewport: React.FC<GameViewportProps> = ({
   });
 
   const [nearbyInteractable, setNearbyInteractable] = useState<InteractableObject | null>(null);
+  const [nearbyTableId, setNearbyTableId] = useState<string | null>(null);
   const [isNearDoor, setIsNearDoor] = useState(false);
   const [isNearEntrance, setIsNearEntrance] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
-  const [controlType, setControlType] = useState<'joystick' | 'dpad'>('joystick');
+  const [controlType, setControlType] = useState<'joystick' | 'tap'>('joystick');
   const [showTouchControls, setShowTouchControls] = useState(() => {
     if (typeof window === 'undefined') return false;
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
@@ -76,6 +85,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
   const keysRef = useRef<Record<string, boolean>>({});
   const joystickVectorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const tapTargetRef = useRef<{ x: number; y: number } | null>(null);
+  const tapRippleRef = useRef<{ x: number; y: number; radius: number; alpha: number } | null>(null);
+  const camOffsetRef = useRef<{ x: number; y: number; scale: number }>({ x: 0, y: 0, scale: DEFAULT_SCALE });
   const atmosphereRef = useRef<AtmosphericSystem>(new AtmosphericSystem());
 
   const setVirtualKey = (code: string, pressed: boolean) => {
@@ -91,25 +103,60 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       onInteractDoor();
     } else if (nearbyInteractable) {
       onInteract(nearbyInteractable);
+    } else if (nearbyTableId && onInteractTable) {
+      onInteractTable(nearbyTableId);
     }
+  };
+
+  const handleCanvasPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (isLocked) return;
+    if (controlType !== 'tap') return;
+
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const cssX = e.clientX - rect.left;
+    const cssY = e.clientY - rect.top;
+    const canvasX = (cssX / rect.width) * canvas.width;
+    const canvasY = (cssY / rect.height) * canvas.height;
+
+    const scale = camOffsetRef.current.scale || device.scale || DEFAULT_SCALE;
+    const worldX = (canvasX / scale) - camOffsetRef.current.x;
+    const worldY = (canvasY / scale) - camOffsetRef.current.y;
+
+    tapTargetRef.current = { x: worldX, y: worldY };
+    tapRippleRef.current = { x: worldX, y: worldY, radius: 2, alpha: 1.0 };
+    sounds.playBlip(720);
   };
 
   // Reset player position and atmospheric effects when room changes
   useEffect(() => {
-    playerRef.current.x = room.playerSpawn.x * TILE_SIZE;
-    playerRef.current.y = room.playerSpawn.y * TILE_SIZE;
-    playerRef.current.dir = 'down';
+    if (spawnDirection === 'backward' && room.exitDoor) {
+      // Transport to the top of the room (where player came from), facing down
+      playerRef.current.x = (room.exitDoor.x + (room.exitDoor.width || 2) / 2 - 0.5) * TILE_SIZE;
+      playerRef.current.y = (room.exitDoor.y + (room.exitDoor.height || 2) + 0.2) * TILE_SIZE;
+      playerRef.current.dir = 'down';
+    } else {
+      playerRef.current.x = room.playerSpawn.x * TILE_SIZE;
+      playerRef.current.y = room.playerSpawn.y * TILE_SIZE;
+      playerRef.current.dir = 'down';
+    }
+    tapTargetRef.current = null;
+    tapRippleRef.current = null;
     atmosphereRef.current.init(room.id, room.width, room.height, TILE_SIZE);
-  }, [room]);
+  }, [room, spawnDirection]);
 
   // When locked (minigame or modal active), clear keys and stop movement
   useEffect(() => {
     if (isLocked) {
       keysRef.current = {};
       joystickVectorRef.current = { x: 0, y: 0 };
+      tapTargetRef.current = null;
+      tapRippleRef.current = null;
       playerRef.current.moving = false;
       playerRef.current.frame = 0;
       setNearbyInteractable(null);
+      setNearbyTableId(null);
       setIsNearDoor(false);
       setIsNearEntrance(false);
     }
@@ -133,6 +180,8 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           onInteractDoor();
         } else if (nearbyInteractable) {
           onInteract(nearbyInteractable);
+        } else if (nearbyTableId && onInteractTable) {
+          onInteractTable(nearbyTableId);
         }
       } else if (e.code === 'KeyI') {
         e.preventDefault();
@@ -272,17 +321,84 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       }
     }
 
-    // 2. Draw Floor Rugs & Under-decorations
+    // 2. Draw Floor Rugs & Under-decorations (Authentic Japanese Woven Textile Rugs)
     for (const deco of room.decorations) {
       if (!deco.solid && deco.type === 'rug') {
-        const w = (deco.width || 3) * TILE_SIZE;
-        const h = (deco.height || 2) * TILE_SIZE;
-        bgCtx.fillStyle = room.id === 'room-3' ? '#831843' : (room.id === 'room-2' ? '#78350f' : '#7c2d12');
-        bgCtx.fillRect(deco.x * TILE_SIZE, deco.y * TILE_SIZE, w, h);
-        bgCtx.fillStyle = room.id === 'room-3' ? '#f472b6' : (room.id === 'room-2' ? '#f59e0b' : '#b45309');
-        bgCtx.strokeRect(deco.x * TILE_SIZE + 1.5, deco.y * TILE_SIZE + 1.5, w - 3, h - 3);
-        bgCtx.fillStyle = '#fef08a';
-        bgCtx.fillRect(deco.x * TILE_SIZE + w / 2 - 4, deco.y * TILE_SIZE + h / 2 - 4, 8, 8);
+        const w = (deco.width || 4) * TILE_SIZE;
+        const h = (deco.height || 3) * TILE_SIZE;
+        const rx = deco.x * TILE_SIZE;
+        const ry = deco.y * TILE_SIZE;
+
+        // Authentic palette per chamber
+        let baseColor = '#0f172a'; // Deep slate navy
+        let innerColor = '#1e293b';
+        let borderColor = '#06b6d4'; // Cyan neon accent
+        let accentColor = '#f59e0b';
+        if (room.id === 'room-2') {
+          // Ceremonial Ryokan velvet rug
+          baseColor = '#7f1d1d'; // Crimson
+          innerColor = '#991b1b';
+          borderColor = '#d97706'; // Gold brocade
+          accentColor = '#fef08a';
+        } else if (room.id === 'room-3') {
+          // Imperial Sacred Torii Sanctum rug
+          baseColor = '#4c0519'; // Deep imperial rose
+          innerColor = '#581c87'; // Purple velvet
+          borderColor = '#eab308'; // Sacred gold
+          accentColor = '#fde047';
+        }
+
+        // Soft floor drop shadow around rug perimeter
+        bgCtx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+        bgCtx.fillRect(rx + 2, ry + 2, w, h);
+
+        // Main woven textile base
+        bgCtx.fillStyle = baseColor;
+        bgCtx.fillRect(rx, ry, w, h);
+
+        // Outer ornate woven border
+        bgCtx.strokeStyle = borderColor;
+        bgCtx.lineWidth = 1.5;
+        bgCtx.strokeRect(rx + 2, ry + 2, w - 4, h - 4);
+
+        // Inner textile field
+        bgCtx.fillStyle = innerColor;
+        bgCtx.fillRect(rx + 4, ry + 4, w - 8, h - 8);
+
+        // Decorative corner woven diamonds
+        bgCtx.fillStyle = accentColor;
+        bgCtx.fillRect(rx + 5, ry + 5, 2, 2);
+        bgCtx.fillRect(rx + w - 7, ry + 5, 2, 2);
+        bgCtx.fillRect(rx + 5, ry + h - 7, 2, 2);
+        bgCtx.fillRect(rx + w - 7, ry + h - 7, 2, 2);
+
+        // Center Medallion (Diamond crest mandala)
+        const cx = rx + w / 2;
+        const cy = ry + h / 2;
+        bgCtx.fillStyle = borderColor;
+        bgCtx.beginPath();
+        bgCtx.moveTo(cx, cy - 8);
+        bgCtx.lineTo(cx + 8, cy);
+        bgCtx.lineTo(cx, cy + 8);
+        bgCtx.lineTo(cx - 8, cy);
+        bgCtx.closePath();
+        bgCtx.fill();
+
+        bgCtx.fillStyle = accentColor;
+        bgCtx.beginPath();
+        bgCtx.moveTo(cx, cy - 4);
+        bgCtx.lineTo(cx + 4, cy);
+        bgCtx.lineTo(cx, cy + 4);
+        bgCtx.lineTo(cx - 4, cy);
+        bgCtx.closePath();
+        bgCtx.fill();
+
+        // White/cream fringe tassels along top and bottom edges
+        bgCtx.fillStyle = '#fef3c7';
+        for (let fx = rx + 3; fx < rx + w - 3; fx += 3) {
+          bgCtx.fillRect(fx, ry - 1, 1, 2);
+          bgCtx.fillRect(fx, ry + h - 1, 1, 2);
+        }
       }
     }
 
@@ -335,15 +451,28 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         if (keys['ArrowRight'] || keys['KeyD']) dx += 1;
 
         if (dx !== 0 || dy !== 0) {
+          tapTargetRef.current = null;
           // Normalize diagonal keyboard speed
           if (dx !== 0 && dy !== 0) {
             dx *= 0.7071;
             dy *= 0.7071;
           }
         } else if (joystickVectorRef.current.x !== 0 || joystickVectorRef.current.y !== 0) {
+          tapTargetRef.current = null;
           // Read smooth touch analog joystick vector
           dx = joystickVectorRef.current.x;
           dy = joystickVectorRef.current.y;
+        } else if (controlType === 'tap' && tapTargetRef.current) {
+          const targetDist = Math.hypot(
+            tapTargetRef.current.x - (player.x + 8),
+            tapTargetRef.current.y - (player.y + 16)
+          );
+          if (targetDist < 4) {
+            tapTargetRef.current = null;
+          } else {
+            dx = (tapTargetRef.current.x - (player.x + 8)) / targetDist;
+            dy = (tapTargetRef.current.y - (player.y + 16)) / targetDist;
+          }
         }
       }
 
@@ -400,6 +529,10 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         const blockedX = dx !== 0 && !movedX;
         const blockedY = dy !== 0 && !movedY;
         const isBumping = (!movedX && !movedY) || (dx !== 0 && dy === 0 && blockedX) || (dy !== 0 && dx === 0 && blockedY);
+
+        if (isBumping && tapTargetRef.current) {
+          tapTargetRef.current = null;
+        }
 
         if (isBumping && player.bumpCooldown <= 0) {
           sounds.playBump();
@@ -473,14 +606,42 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           }
         }
         setNearbyInteractable(closestObj);
+
+        // Display tables distance
+        let closestTable: string | null = null;
+        let minTableDist = Infinity;
+        for (const deco of room.decorations) {
+          if (deco.type === 'table' || deco.displayTable) {
+            const tableW = (deco.width || 2) * TILE_SIZE;
+            const tableH = (deco.height || 1.5) * TILE_SIZE;
+            const tableCenterX = deco.x * TILE_SIZE + tableW / 2;
+            const tableCenterY = deco.y * TILE_SIZE + tableH / 2;
+            const dist = Math.hypot(playerCenterX - tableCenterX, playerCenterY - tableCenterY);
+            if (dist < 36 && dist < minTableDist) {
+              minTableDist = dist;
+              closestTable = deco.id || 'table';
+            }
+          }
+        }
+        setNearbyTableId(closestTable);
       } else {
         setIsNearDoor(false);
         setIsNearEntrance(false);
         setNearbyInteractable(null);
+        setNearbyTableId(null);
       }
 
       // Update atmospheric particle simulation
       atmosphereRef.current.update();
+
+      // Update tap ripple animation
+      if (tapRippleRef.current) {
+        tapRippleRef.current.radius += 0.8;
+        tapRippleRef.current.alpha -= 0.05;
+        if (tapRippleRef.current.alpha <= 0) {
+          tapRippleRef.current = null;
+        }
+      }
 
       // --- RENDERING ---
       // Clear
@@ -495,7 +656,6 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
       let camTranslateX: number;
       if (viewW >= room.width * TILE_SIZE) {
-        // Room is narrower than viewport -> center horizontally
         camTranslateX = Math.round((viewW - room.width * TILE_SIZE) / 2);
       } else {
         const camX = Math.round(player.x + 8 - viewW / 2);
@@ -505,7 +665,6 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
       let camTranslateY: number;
       if (viewH >= room.height * TILE_SIZE) {
-        // Room is shorter than viewport -> center vertically
         camTranslateY = Math.round((viewH - room.height * TILE_SIZE) / 2);
       } else {
         const camY = Math.round(player.y + 12 - viewH / 2);
@@ -513,10 +672,13 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         camTranslateY = -Math.max(0, Math.min(camY, maxCamY));
       }
 
+      // Store camera transformation for tap-to-move raycast coordinate conversion
+      camOffsetRef.current = { x: camTranslateX, y: camTranslateY, scale: currentScale };
+
       ctx.scale(currentScale, currentScale);
       ctx.translate(camTranslateX, camTranslateY);
 
-      // 1. Draw Pre-rendered Room Background in 1 lightning-fast call!
+      // 1. Draw Pre-rendered Room Background
       if (bgCanvasRef.current) {
         ctx.drawImage(bgCanvasRef.current, 0, 0);
       }
@@ -527,41 +689,61 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       // 1c. Wall Candle Sconces, Shrine Lanterns & Blinking Terminal LEDs
       atmosphereRef.current.drawCandlesAndLanterns(ctx, TILE_SIZE);
 
-      // 2. Draw Door
+      // 2. Draw Door with Threshold Ground Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      ctx.fillRect(room.exitDoor.x * TILE_SIZE, (room.exitDoor.y + (room.exitDoor.height || 2) - 1) * TILE_SIZE, room.exitDoor.width * TILE_SIZE, 3);
       const doorSprite = getDoorSprite(isDoorUnlocked, room.exitDoor.targetIcon, room.id);
       ctx.drawImage(doorSprite, room.exitDoor.x * TILE_SIZE, (room.exitDoor.y - 1) * TILE_SIZE);
 
-      // 2b. Draw Entrance Door (Return doorway to previous chamber)
+      // 2b. Draw Entrance Door with Threshold Ground Shadow
       if (room.entranceDoor) {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+        ctx.fillRect(room.entranceDoor.x * TILE_SIZE, (room.entranceDoor.y + (room.entranceDoor.height || 2) - 1) * TILE_SIZE, room.entranceDoor.width * TILE_SIZE, 3);
         const prevRoomId = `room-${room.number - 1}`;
         const entranceSprite = getDoorSprite(true, '↩', prevRoomId);
         ctx.drawImage(entranceSprite, room.entranceDoor.x * TILE_SIZE, (room.entranceDoor.y - 1) * TILE_SIZE);
       }
 
-      // 3. Y-SORTED OBJECTS & CHARACTERS
+      // 3. Y-SORTED OBJECTS & CHARACTERS (ALL GROUNDED WITH AMBIENT DROP SHADOWS)
       interface RenderEntity {
         y: number;
         render: () => void;
       }
       const renderList: RenderEntity[] = [];
 
-      // Add Player
+      // Add Player (with grounded feet shadow)
       renderList.push({
         y: player.y + 20,
         render: () => {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+          ctx.beginPath();
+          ctx.ellipse(player.x + 8, player.y + 22, 6, 2.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+
           const charSprite = getCharacterSprite(characterId, player.dir, player.frame, player.moving);
           ctx.drawImage(charSprite, Math.round(player.x), Math.round(player.y));
         },
       });
 
-      // Add Interactables
+      // Add Interactables (with grounded object base shadow)
       for (const obj of room.interactables) {
         const isCompleted = completedMinigames.includes(obj.id);
+        const objW = obj.width * TILE_SIZE;
+        const objH = obj.height * TILE_SIZE;
+        const objX = obj.x * TILE_SIZE;
+        const objY = obj.y * TILE_SIZE;
+
         renderList.push({
           y: (obj.y + obj.height) * TILE_SIZE,
           render: () => {
+            // Ambient drop shadow beneath object on floor
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+            ctx.beginPath();
+            ctx.ellipse(objX + objW / 2, objY + objH - 1, objW / 2 + 1, 4.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
             const propSprite = getInteractableSprite(obj.spriteType, obj.minigameType);
-            ctx.drawImage(propSprite, obj.x * TILE_SIZE, obj.y * TILE_SIZE);
+            ctx.drawImage(propSprite, objX, objY, objW, objH);
 
             // Completed checkmark indicator floating
             if (isCompleted) {
@@ -575,16 +757,63 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         });
       }
 
-      // Add Solid Decorations (Plants, Shelves)
+      // Add Solid Decorations (Plants, Display Tables, Storage Chests with Ground Shadows)
       for (const deco of room.decorations) {
         if (deco.solid) {
           const w = (deco.width || 1) * TILE_SIZE;
           const h = (deco.height || 1) * TILE_SIZE;
+          const decoX = deco.x * TILE_SIZE;
+          const decoY = deco.y * TILE_SIZE;
+
           renderList.push({
-            y: deco.y * TILE_SIZE + h,
+            y: decoY + h,
             render: () => {
-              const decoSprite = getDecorationSprite(deco.type, room.id);
-              ctx.drawImage(decoSprite, deco.x * TILE_SIZE, deco.y * TILE_SIZE, w, h);
+              // Floor contact drop shadow under base
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+              ctx.beginPath();
+              ctx.ellipse(decoX + w / 2, decoY + h - 1, w / 2, 4, 0, 0, Math.PI * 2);
+              ctx.fill();
+
+              if (deco.type === 'table' || deco.displayTable) {
+                const tableSprite = getTableSprite(room.id, deco.width || 2, deco.height || 1.5);
+                ctx.drawImage(tableSprite, decoX, decoY, w, h);
+
+                // Draw exhibited collectibles on tabletop
+                const displayed = (displayedItems && deco.id && displayedItems[deco.id]) || [];
+                if (displayed && displayed.length > 0) {
+                  // Slot 1 (Left)
+                  if (displayed[0]) {
+                    const item1 = JAPANESE_DICTIONARY[displayed[0]] || { icon: '✨' };
+                    ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
+                    ctx.beginPath();
+                    ctx.ellipse(decoX + 8, decoY + 5, 5, 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.save();
+                    ctx.font = '11px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(item1.icon, decoX + 8, decoY + 3);
+                    ctx.restore();
+                  }
+                  // Slot 2 (Right)
+                  if (displayed[1]) {
+                    const item2 = JAPANESE_DICTIONARY[displayed[1]] || { icon: '✨' };
+                    ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
+                    ctx.beginPath();
+                    ctx.ellipse(decoX + w - 8, decoY + 5, 5, 2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.save();
+                    ctx.font = '11px serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(item2.icon, decoX + w - 8, decoY + 3);
+                    ctx.restore();
+                  }
+                }
+              } else {
+                const decoSprite = getDecorationSprite(deco.type, room.id);
+                ctx.drawImage(decoSprite, decoX, decoY, w, h);
+              }
             },
           });
         }
@@ -596,10 +825,19 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         item.render();
       }
 
-      // 4. Foreground Atmospheric Particles (Floating dust motes, Sakura petals, altar embers)
+      // 4. Tap-to-Move floor indicator ripple
+      if (tapRippleRef.current) {
+        ctx.strokeStyle = `rgba(250, 204, 21, ${tapRippleRef.current.alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(tapRippleRef.current.x, tapRippleRef.current.y, tapRippleRef.current.radius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 5. Foreground Atmospheric Particles
       atmosphereRef.current.drawAtmosphere(ctx);
 
-      // 5. Debug overlay
+      // 6. Debug overlay
       if (debugMode) {
         ctx.strokeStyle = 'rgba(239, 68, 68, 0.8)';
         ctx.lineWidth = 1;
@@ -642,53 +880,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
     device.scale,
     device.canvasWidth,
     device.canvasHeight,
+    controlType,
+    displayedItems,
   ]);
-
-  const renderDPad = () => (
-    <div className="flex flex-col items-center select-none touch-none">
-      {/* UP */}
-      <button
-        onPointerDown={(e) => { e.preventDefault(); setVirtualKey('ArrowUp', true); }}
-        onPointerUp={() => setVirtualKey('ArrowUp', false)}
-        onPointerLeave={() => setVirtualKey('ArrowUp', false)}
-        className="w-11 h-9 sm:w-12 sm:h-10 bg-slate-900/90 active:bg-indigo-600 border-2 border-slate-600 active:border-yellow-400 text-yellow-300 font-pixel text-xs flex items-center justify-center shadow-lg active:scale-95 cursor-pointer rounded-t-sm"
-      >
-        ▲
-      </button>
-      <div className="flex gap-1 my-0.5">
-        {/* LEFT */}
-        <button
-          onPointerDown={(e) => { e.preventDefault(); setVirtualKey('ArrowLeft', true); }}
-          onPointerUp={() => setVirtualKey('ArrowLeft', false)}
-          onPointerLeave={() => setVirtualKey('ArrowLeft', false)}
-          className="w-11 h-9 sm:w-12 sm:h-10 bg-slate-900/90 active:bg-indigo-600 border-2 border-slate-600 active:border-yellow-400 text-yellow-300 font-pixel text-xs flex items-center justify-center shadow-lg active:scale-95 cursor-pointer rounded-l-sm"
-        >
-          ◀
-        </button>
-        <div className="w-8 h-9 sm:w-10 sm:h-10 bg-slate-950/80 border border-slate-800 flex items-center justify-center text-[7px] text-slate-500 font-pixel">
-          PAD
-        </div>
-        {/* RIGHT */}
-        <button
-          onPointerDown={(e) => { e.preventDefault(); setVirtualKey('ArrowRight', true); }}
-          onPointerUp={() => setVirtualKey('ArrowRight', false)}
-          onPointerLeave={() => setVirtualKey('ArrowRight', false)}
-          className="w-11 h-9 sm:w-12 sm:h-10 bg-slate-900/90 active:bg-indigo-600 border-2 border-slate-600 active:border-yellow-400 text-yellow-300 font-pixel text-xs flex items-center justify-center shadow-lg active:scale-95 cursor-pointer rounded-r-sm"
-        >
-          ▶
-        </button>
-      </div>
-      {/* DOWN */}
-      <button
-        onPointerDown={(e) => { e.preventDefault(); setVirtualKey('ArrowDown', true); }}
-        onPointerUp={() => setVirtualKey('ArrowDown', false)}
-        onPointerLeave={() => setVirtualKey('ArrowDown', false)}
-        className="w-11 h-9 sm:w-12 sm:h-10 bg-slate-900/90 active:bg-indigo-600 border-2 border-slate-600 active:border-yellow-400 text-yellow-300 font-pixel text-xs flex items-center justify-center shadow-lg active:scale-95 cursor-pointer rounded-b-sm"
-      >
-        ▼
-      </button>
-    </div>
-  );
 
   const isPortraitEmulator = device.orientation === 'portrait' || (device.isMobile && !device.isDesktop);
 
@@ -704,11 +898,13 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           ref={canvasRef}
           width={device.canvasWidth}
           height={device.canvasHeight}
+          onPointerDown={handleCanvasPointerDown}
           style={{
             aspectRatio: device.aspectRatio === '16:9' ? '16 / 9' : '3 / 2',
-            maxHeight: isPortraitEmulator ? '50vh' : device.isDesktop ? '76vh' : '65vh',
+            maxHeight: isPortraitEmulator ? '52vh' : device.isDesktop ? '76vh' : '65vh',
+            touchAction: 'none',
           }}
-          className="w-full pixelated block cursor-default object-contain"
+          className="w-full pixelated block cursor-pointer object-contain"
         />
 
         {/* Floating Pixel Interaction Prompt (Only shown near object or door) */}
@@ -722,9 +918,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         )}
 
         {!isLocked && isNearDoor && !isNearEntrance && (
-          <div className={`absolute top-3 bg-black/90 border-2 ${theme.borderClass} ${theme.pixelBoxClass} px-3 py-1.5 flex items-center gap-1.5 animate-bounce z-20`}>
-            <span className={`font-pixel text-[10px] sm:text-xs ${theme.accentTextClass}`}>
-              {isDoorUnlocked ? '[E] OPEN DOOR' : '[E] EXAMINE DOOR'}
+          <div className={`absolute top-3 bg-black/90 border-2 ${isDoorUnlocked ? 'border-emerald-400' : theme.borderClass} ${theme.pixelBoxClass} px-3 py-1.5 flex items-center gap-1.5 animate-bounce z-20`}>
+            <span className={`font-pixel text-[10px] sm:text-xs ${isDoorUnlocked ? 'text-emerald-300 font-bold' : theme.accentTextClass}`}>
+              {isDoorUnlocked ? '[E] ENTER NEXT ROOM ➔' : '[E] EXAMINE DOOR'}
             </span>
             <span className="text-sm">{room.targetIcon}</span>
           </div>
@@ -741,6 +937,15 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           </div>
         )}
 
+        {!isLocked && nearbyTableId && !nearbyInteractable && !isNearDoor && !isNearEntrance && (
+          <div className={`absolute top-3 bg-black/90 border-2 border-amber-400 ${theme.pixelBoxClass} px-3 py-1.5 flex items-center gap-1.5 animate-bounce z-20`}>
+            <span className="font-pixel text-[10px] sm:text-xs text-amber-300">
+              [E] EXHIBIT TABLE
+            </span>
+            <span className="text-sm">🏺</span>
+          </div>
+        )}
+
         {/* Landscape floating controls for mobile landscape only */}
         {!isPortraitEmulator && !isLocked && showTouchControls && (
           <>
@@ -752,7 +957,13 @@ export const GameViewport: React.FC<GameViewportProps> = ({
                   disabled={isLocked}
                 />
               ) : (
-                renderDPad()
+                <button
+                  onClick={() => { sounds.playSelect(); setControlType('joystick'); }}
+                  className="px-3 py-2 bg-slate-950/90 border-2 border-amber-400 rounded-sm font-pixel text-[10px] text-amber-300 shadow-xl cursor-pointer flex items-center gap-1"
+                >
+                  <span>👆 TAP ACTIVE</span>
+                  <span className="text-[8px] text-slate-400">➔ 🕹️ STICK</span>
+                </button>
               )}
             </div>
             <div className="absolute bottom-3 right-3 z-30 flex flex-col gap-2 items-end opacity-90 hover:opacity-100 transition-opacity pointer-events-auto">
@@ -762,13 +973,15 @@ export const GameViewport: React.FC<GameViewportProps> = ({
                   isNearEntrance
                     ? 'bg-amber-600/95 hover:bg-amber-500 border-white text-white animate-pulse'
                     : isNearDoor
-                    ? 'bg-yellow-500/95 hover:bg-yellow-400 border-white text-black animate-pulse'
+                    ? (isDoorUnlocked ? 'bg-emerald-600/95 hover:bg-emerald-500 border-white text-white animate-pulse' : 'bg-yellow-500/95 hover:bg-yellow-400 border-white text-black animate-pulse')
                     : nearbyInteractable
                     ? 'bg-cyan-500/95 hover:bg-cyan-400 border-white text-black animate-pulse'
+                    : nearbyTableId
+                    ? 'bg-amber-600/95 hover:bg-amber-500 border-white text-white animate-pulse'
                     : 'bg-slate-900/90 border-slate-600 text-slate-300'
                 }`}
               >
-                [E] {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'OPEN' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : 'ACTION'}
+                [E] {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'ENTER' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : nearbyTableId ? 'EXHIBIT' : 'ACTION'}
               </button>
               <button
                 onPointerDown={(e) => { e.preventDefault(); sounds.playSelect(); onOpenInventory(); }}
@@ -780,8 +993,8 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           </>
         )}
 
-        {/* Desktop Controls Bar at bottom of screen */}
-        {!isPortraitEmulator && !isLocked && (
+        {/* Desktop Controls Bar at bottom of screen - Hidden on touch/mobile to prevent overlapping buttons */}
+        {!isPortraitEmulator && !isLocked && !device.isMobile && !showTouchControls && (
           <div className="absolute bottom-1 left-2 right-2 flex justify-between items-center text-[9px] sm:text-[10px] font-pixel text-slate-400 bg-black/85 backdrop-blur-xs px-2 sm:px-3 py-1 border border-slate-700/60 z-20 gap-2">
             <span className="hidden sm:inline">WASD/Arrows = Move • [E] = Interact • [I] = Bag</span>
             <span className="sm:hidden text-amber-300/80">Kana Escape</span>
@@ -817,7 +1030,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       {/* 2. Lower Handheld Emulator Control Deck (Dedicated Bottom Controller Panel in Portrait) */}
       {isPortraitEmulator && !isLocked && (
         <div className="w-full max-w-xl sm:max-w-2xl flex justify-between items-center px-3 py-2 sm:px-5 sm:py-3 bg-gradient-to-b from-[#16152a] to-[#0c0b18] border-2 border-slate-800 pixel-box shadow-2xl mt-auto mb-1 rounded-sm touch-none select-none">
-          {/* Left: Virtual Joystick or D-Pad */}
+          {/* Left: Virtual Joystick OR Tap-To-Move Active Badge */}
           <div className="flex items-center justify-center shrink-0">
             {controlType === 'joystick' ? (
               <VirtualJoystick
@@ -830,21 +1043,25 @@ export const GameViewport: React.FC<GameViewportProps> = ({
                 disabled={isLocked}
               />
             ) : (
-              renderDPad()
+              <div className="w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] rounded-xl bg-slate-950/95 border-2 border-amber-500/70 flex flex-col items-center justify-center p-2 text-center shadow-lg">
+                <span className="text-2xl animate-pulse">👆</span>
+                <span className="text-[9px] text-amber-300 font-bold mt-1">TAP TO MOVE</span>
+                <span className="text-[7px] text-slate-400 mt-0.5 leading-tight">Tap floor to walk</span>
+              </div>
             )}
           </div>
 
-          {/* Center: System Toggles */}
+          {/* Center: Controller Mode & Ratio Toggles */}
           <div className="flex flex-col items-center gap-2 mx-1 sm:mx-2">
             <button
               onClick={() => {
                 sounds.playSelect();
-                setControlType((prev) => (prev === 'joystick' ? 'dpad' : 'joystick'));
+                setControlType((prev) => (prev === 'joystick' ? 'tap' : 'joystick'));
               }}
-              className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-[8px] font-pixel text-yellow-300 border border-slate-700 rounded cursor-pointer active:scale-95 shadow-sm"
-              title="Switch between Virtual Joystick and D-Pad"
+              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-[8px] sm:text-[9px] font-pixel text-yellow-300 border border-amber-500/70 rounded cursor-pointer active:scale-95 shadow-sm"
+              title="Toggle between Virtual Joystick and Tap to Move"
             >
-              {controlType === 'joystick' ? '🕹️ STICK' : '🎮 D-PAD'}
+              {controlType === 'joystick' ? '🕹️ STICK' : '👆 TAP MOVE'}
             </button>
             <button
               onClick={() => {
@@ -884,16 +1101,18 @@ export const GameViewport: React.FC<GameViewportProps> = ({
                 isNearEntrance
                   ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(245,158,11,0.85)]'
                   : isNearDoor
-                  ? 'bg-gradient-to-b from-yellow-400 to-amber-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(250,204,21,0.85)]'
+                  ? (isDoorUnlocked ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(16,185,129,0.85)]' : 'bg-gradient-to-b from-yellow-400 to-amber-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(250,204,21,0.85)]')
                   : nearbyInteractable
                   ? 'bg-gradient-to-b from-cyan-400 to-blue-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(34,211,238,0.85)]'
+                  : nearbyTableId
+                  ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(245,158,11,0.85)]'
                   : 'bg-gradient-to-b from-slate-800 to-slate-950 border-slate-500 text-slate-200 active:bg-indigo-700 shadow-md'
               }`}
               title="Interact / Action [E]"
             >
               <span className="text-sm font-bold">[E]</span>
               <span className="text-[7px] tracking-tight">
-                {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'OPEN' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : 'ACTION'}
+                {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'ENTER' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : nearbyTableId ? 'EXHIBIT' : 'ACTION'}
               </span>
             </button>
           </div>

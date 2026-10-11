@@ -117,8 +117,8 @@ export function useDeviceMode(): DeviceModeInfo {
     if (isPortrait) {
       aspectRatio = '3:2';
       canvasWidth = 720;
-      canvasHeight = 480;
-      scale = 3.3;
+      canvasHeight = 540;
+      scale = 3.85;
     } else {
       aspectRatio = '16:9';
       canvasWidth = 800;
