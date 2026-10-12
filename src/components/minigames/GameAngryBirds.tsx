@@ -44,28 +44,33 @@ interface Particle {
 }
 
 const initBlocks = (): Block[] => [
-  // Tier 1: Foundation Stone Pillars
-  { id: 'p1', x: 172, y: 135, w: 10, h: 40, color: '#64748b', border: '#475569', type: 'stone', alive: true, falling: false, vy: 0 },
-  { id: 'p2', x: 204, y: 135, w: 10, h: 40, color: '#64748b', border: '#475569', type: 'stone', alive: true, falling: false, vy: 0 },
-  { id: 'p3', x: 236, y: 135, w: 10, h: 40, color: '#64748b', border: '#475569', type: 'stone', alive: true, falling: false, vy: 0 },
-  // Tier 1 Roof / Tier 2 Floor Beam
-  { id: 'b1', x: 168, y: 128, w: 82, h: 7, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['p1', 'p2', 'p3'] },
-  // Tier 2: Mid Columns
-  { id: 'p4', x: 184, y: 92, w: 10, h: 36, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['b1'] },
-  { id: 'p5', x: 224, y: 92, w: 10, h: 36, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['b1'] },
-  // Tier 2 Roof Beam
-  { id: 'b2', x: 178, y: 85, w: 62, h: 7, color: '#dc2626', border: '#991b1b', type: 'wood', alive: true, falling: false, vy: 0, supports: ['p4', 'p5'] },
-  // Tier 3 Pagoda Crown Peak
-  { id: 'b3', x: 196, y: 56, w: 26, h: 6, color: '#f59e0b', border: '#b45309', type: 'wood', alive: true, falling: false, vy: 0, supports: ['b2'] },
+  // --- BASTION 1: Forward Watchtower (Left Structure: x 155-192) ---
+  { id: 'w1', x: 156, y: 135, w: 9, h: 40, color: '#64748b', border: '#475569', type: 'stone', alive: true, falling: false, vy: 0 },
+  { id: 'w2', x: 184, y: 135, w: 9, h: 40, color: '#64748b', border: '#475569', type: 'stone', alive: true, falling: false, vy: 0 },
+  { id: 'wb1', x: 152, y: 128, w: 44, h: 7, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['w1', 'w2'] },
+  { id: 'wt_roof', x: 160, y: 102, w: 28, h: 6, color: '#dc2626', border: '#991b1b', type: 'wood', alive: true, falling: false, vy: 0, supports: ['wb1'] },
+
+  // --- BASTION 2: Rear Fortified Sanctum (Right Structure: x 214-256) ---
+  // High Front Shield Wall (defends internal sanctuary from direct ground shots)
+  { id: 'shield', x: 214, y: 110, w: 10, h: 65, color: '#64748b', border: '#334155', type: 'stone', alive: true, falling: false, vy: 0 },
+  // Rear Foundation Pillar
+  { id: 'r_pillar', x: 246, y: 135, w: 10, h: 40, color: '#64748b', border: '#475569', type: 'stone', alive: true, falling: false, vy: 0 },
+  // Sanctum Mid Roof Beam
+  { id: 'sb1', x: 210, y: 103, w: 48, h: 7, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['shield', 'r_pillar'] },
+  // Upper Pagoda Crown Columns
+  { id: 'c1', x: 224, y: 72, w: 8, h: 31, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['sb1'] },
+  { id: 'c2', x: 242, y: 72, w: 8, h: 31, color: '#b45309', border: '#78350f', type: 'wood', alive: true, falling: false, vy: 0, supports: ['sb1'] },
+  // Upper Peak Roof
+  { id: 'sb2', x: 218, y: 65, w: 38, h: 7, color: '#dc2626', border: '#991b1b', type: 'wood', alive: true, falling: false, vy: 0, supports: ['c1', 'c2'] },
 ];
 
 const initTargets = (): Target[] => [
-  // Ground Sanctuary (vaulted between p1 & p2)
-  { id: 't1', x: 191, y: 160, r: 7, alive: true, falling: false, vy: 0 },
-  // Mid Shrine (resting on beam b1)
-  { id: 't2', x: 209, y: 118, r: 7, alive: true, falling: false, vy: 0, supportedBy: 'b1' },
-  // Celestial Crown (atop upper roof b2)
-  { id: 't3', x: 209, y: 76, r: 7, alive: true, falling: false, vy: 0, supportedBy: 'b2' },
+  // Target 1: Stationed in Forward Watchtower
+  { id: 't1', x: 174, y: 118, r: 7, alive: true, falling: false, vy: 0, supportedBy: 'wb1' },
+  // Target 2: Sheltered deep in Rear Sanctum (behind the tall shield pillar)
+  { id: 't2', x: 232, y: 160, r: 7, alive: true, falling: false, vy: 0 },
+  // Target 3: Perched atop the high Pagoda Peak
+  { id: 't3', x: 237, y: 56, r: 7, alive: true, falling: false, vy: 0, supportedBy: 'sb2' },
 ];
 
 export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => {
@@ -142,14 +147,11 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
 
     let animId: number;
     let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
     const gravity = 0.22;
 
-    const loop = (currentTime?: number) => {
-      const now = currentTime || performance.now();
-      const deltaMs = now - lastTime;
-      lastTime = now;
-      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
-
+    const updatePhysics = (dt: number = 1.0) => {
       const s = stateRef.current;
       const p = s.projectile;
 
@@ -162,21 +164,23 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
             return suppBlock && suppBlock.alive && !suppBlock.falling;
           });
 
-          // Balanced equilibrium requirement:
-          // b1 (3 pillars): needs at least 2 adjacent solid pillars to stand
-          if (b.id === 'b1') {
-            const p1 = s.blocks.find((x) => x.id === 'p1');
-            const p2 = s.blocks.find((x) => x.id === 'p2');
-            const p3 = s.blocks.find((x) => x.id === 'p3');
-            const p1Solid = p1 && p1.alive && !p1.falling;
-            const p2Solid = p2 && p2.alive && !p2.falling;
-            const p3Solid = p3 && p3.alive && !p3.falling;
-            // If center pillar is gone, or any 2 pillars are gone: foundation gives way and collapses!
-            if ((!p1Solid && !p2Solid) || (!p2Solid && !p3Solid) || (!p1Solid && !p3Solid) || solidSupports.length <= 1) {
+          // Bastion structural equilibrium checks
+          if (b.id === 'wb1') {
+            // Forward Watchtower beam falls if either supporting pillar is knocked out
+            if (solidSupports.length < 2) {
+              b.falling = true;
+            }
+          } else if (b.id === 'sb1') {
+            // Rear Sanctum mid beam falls if foundation support fails
+            if (solidSupports.length < 2) {
+              b.falling = true;
+            }
+          } else if (b.id === 'sb2') {
+            // Pagoda peak roof falls if upper columns fail
+            if (solidSupports.length < 2) {
               b.falling = true;
             }
           } else {
-            // b2, b3, p4, p5: If ANY supporting base below fails or falls, upper structure falls!
             if (solidSupports.length < b.supports.length) {
               b.falling = true;
             }
@@ -300,6 +304,24 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
           sounds.playFail();
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const s = stateRef.current;
 
       // Render
       ctx.fillStyle = '#0f172a'; // Deep twilight pagoda sky
@@ -400,6 +422,7 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
       }
 
       // Projectile (Red bird/orb)
+      const p = s.projectile;
       const px = p.active ? p.x : s.dragging ? s.dragX : s.slingX;
       const py = p.active ? p.y : s.dragging ? s.dragY : s.slingY;
       ctx.fillStyle = '#ef4444';
@@ -556,7 +579,7 @@ export const GameAngryBirds: React.FC<GameAngryBirdsProps> = ({ onSuccess }) => 
       </div>
 
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        Pull slingshot to aim • Shatter foundation pillars to trigger cascading structural collapse!
+        Pull slingshot to aim • Shatter watchtower pillars & lob over the shield wall!
       </p>
     </div>
   );

@@ -40,7 +40,7 @@ const TILE_SIZE = 16;
 const DEFAULT_SCALE = 2.5;
 const PLAYER_SPEED = 2.0; // Balanced 16-pixel tile walking pace
 
-export const GameViewport: React.FC<GameViewportProps> = ({
+const GameViewportComponent: React.FC<GameViewportProps> = ({
   room,
   characterId,
   isDoorUnlocked,
@@ -79,7 +79,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
   const [isNearDoor, setIsNearDoor] = useState(false);
   const [isNearEntrance, setIsNearEntrance] = useState(false);
   const [debugMode, setDebugMode] = useState(false);
-  const [controlType, setControlType] = useState<'joystick' | 'tap'>('joystick');
+  const [controlType, setControlType] = useState<'joystick' | 'dpad' | 'tap'>('joystick');
   const [showTouchControls, setShowTouchControls] = useState(() => {
     if (typeof window === 'undefined') return false;
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth < 768;
@@ -87,10 +87,58 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
   const keysRef = useRef<Record<string, boolean>>({});
   const joystickVectorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const activeDpadPointerRef = useRef<number | null>(null);
   const tapTargetRef = useRef<{ x: number; y: number } | null>(null);
   const tapRippleRef = useRef<{ x: number; y: number; radius: number; alpha: number } | null>(null);
   const camOffsetRef = useRef<{ x: number; y: number; scale: number }>({ x: 0, y: 0, scale: DEFAULT_SCALE });
   const atmosphereRef = useRef<AtmosphericSystem>(new AtmosphericSystem());
+
+  const processDpadCoords = (clientX: number, clientY: number, container: HTMLElement) => {
+    const rect = container.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = clientX - cx;
+    const dy = clientY - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 10) {
+      joystickVectorRef.current = { x: 0, y: 0 };
+      return;
+    }
+    const angle = Math.atan2(dy, dx);
+    const snapAngle = Math.round(angle / (Math.PI / 4)) * (Math.PI / 4);
+    const snapX = Math.round(Math.cos(snapAngle));
+    const snapY = Math.round(Math.sin(snapAngle));
+    const mag = Math.hypot(snapX, snapY) || 1;
+    joystickVectorRef.current = { x: snapX / mag, y: snapY / mag };
+  };
+
+  const handleDpadPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isLocked) return;
+    e.preventDefault();
+    e.stopPropagation();
+    activeDpadPointerRef.current = e.pointerId;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // ignore
+    }
+    processDpadCoords(e.clientX, e.clientY, e.currentTarget);
+  };
+
+  const handleDpadPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeDpadPointerRef.current !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    processDpadCoords(e.clientX, e.clientY, e.currentTarget);
+  };
+
+  const handleDpadPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (activeDpadPointerRef.current !== e.pointerId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    activeDpadPointerRef.current = null;
+    joystickVectorRef.current = { x: 0, y: 0 };
+  };
 
   const setVirtualKey = (code: string, pressed: boolean) => {
     if (isLocked) return;
@@ -438,14 +486,10 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
     let animId: number;
     let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
 
-    const gameLoop = (currentTime?: number) => {
-      const now = currentTime || performance.now();
-      const deltaMs = now - lastTime;
-      lastTime = now;
-      // Normalized delta time: 1.0 at 60 FPS, 0.5 at 120 FPS, 0.67 at 90 FPS
-      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
-
+    const updateWorld = (dt: number = 1.0) => {
       const player = playerRef.current;
       const keys = keysRef.current;
 
@@ -586,7 +630,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
         const doorCenterY = (room.exitDoor.y + room.exitDoor.height / 2) * TILE_SIZE;
         const distToDoor = Math.hypot(playerCenterX - doorCenterX, playerCenterY - doorCenterY);
         const nearDoorNow = distToDoor < 34;
-        setIsNearDoor(nearDoorNow);
+        setIsNearDoor((prev) => (prev !== nearDoorNow ? nearDoorNow : prev));
 
         // Entrance door distance (if room has entranceDoor)
         if (room.entranceDoor) {
@@ -594,9 +638,9 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           const entranceCenterY = (room.entranceDoor.y + room.entranceDoor.height / 2) * TILE_SIZE;
           const distToEntrance = Math.hypot(playerCenterX - entranceCenterX, playerCenterY - entranceCenterY);
           const nearEntranceNow = distToEntrance < 34;
-          setIsNearEntrance(nearEntranceNow);
+          setIsNearEntrance((prev) => (prev !== nearEntranceNow ? nearEntranceNow : prev));
         } else {
-          setIsNearEntrance(false);
+          setIsNearEntrance((prev) => (prev ? false : prev));
         }
 
         // Interactables distance
@@ -614,7 +658,7 @@ export const GameViewport: React.FC<GameViewportProps> = ({
             closestObj = obj;
           }
         }
-        setNearbyInteractable(closestObj);
+        setNearbyInteractable((prev) => (prev?.id === closestObj?.id ? prev : closestObj));
 
         // Display tables distance
         let closestTable: string | null = null;
@@ -632,12 +676,12 @@ export const GameViewport: React.FC<GameViewportProps> = ({
             }
           }
         }
-        setNearbyTableId(closestTable);
+        setNearbyTableId((prev) => (prev === closestTable ? prev : closestTable));
       } else {
-        setIsNearDoor(false);
-        setIsNearEntrance(false);
-        setNearbyInteractable(null);
-        setNearbyTableId(null);
+        setIsNearDoor((prev) => (prev ? false : prev));
+        setIsNearEntrance((prev) => (prev ? false : prev));
+        setNearbyInteractable((prev) => (prev ? null : prev));
+        setNearbyTableId((prev) => (prev ? null : prev));
       }
 
       // Update atmospheric particle simulation
@@ -645,12 +689,30 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
       // Update tap ripple animation
       if (tapRippleRef.current) {
-        tapRippleRef.current.radius += 0.8;
-        tapRippleRef.current.alpha -= 0.05;
+        tapRippleRef.current.radius += 0.8 * dt;
+        tapRippleRef.current.alpha -= 0.04 * dt;
         if (tapRippleRef.current.alpha <= 0) {
           tapRippleRef.current = null;
         }
       }
+    };
+
+    const gameLoop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updateWorld(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const player = playerRef.current;
 
       // --- RENDERING ---
       // Clear
@@ -835,18 +897,12 @@ export const GameViewport: React.FC<GameViewportProps> = ({
       }
 
       // 4. Tap-to-Move floor indicator ripple
-      if (tapRippleRef.current) {
-        tapRippleRef.current.radius += 0.8 * dt;
-        tapRippleRef.current.alpha -= 0.04 * dt;
-        if (tapRippleRef.current.alpha <= 0) {
-          tapRippleRef.current = null;
-        } else {
-          ctx.strokeStyle = `rgba(250, 204, 21, ${tapRippleRef.current.alpha})`;
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(tapRippleRef.current.x, tapRippleRef.current.y, tapRippleRef.current.radius, 0, Math.PI * 2);
-          ctx.stroke();
-        }
+      if (tapRippleRef.current && tapRippleRef.current.alpha > 0) {
+        ctx.strokeStyle = `rgba(250, 204, 21, ${tapRippleRef.current.alpha})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(tapRippleRef.current.x, tapRippleRef.current.y, tapRippleRef.current.radius, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
       // 5. Foreground Atmospheric Particles
@@ -904,10 +960,14 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
   return (
     <div className={`w-full flex flex-col items-center select-none ${isPortraitEmulator ? 'h-full flex-1 justify-between min-h-0' : ''}`}>
-      {/* 1. Upper Console Screen (Pure Game Viewport - 0 floating controls on top in emulator mode) */}
+      {/* 1. Upper Console Screen (Pure Game Viewport) */}
       <div
-        className={`relative flex flex-col items-center justify-center w-full transition-all bg-black border-4 border-slate-800 pixel-box shadow-2xl overflow-hidden rounded-sm ${
-          device.isDesktop ? 'max-w-5xl lg:max-w-6xl 2xl:max-w-7xl' : 'max-w-xl sm:max-w-2xl'
+        className={`relative flex flex-col items-center justify-center w-full transition-all bg-black border-4 border-slate-800 pixel-box shadow-2xl overflow-hidden rounded-t-sm ${
+          isPortraitEmulator
+            ? 'flex-1 min-h-0'
+            : device.isDesktop
+            ? 'max-w-5xl lg:max-w-6xl 2xl:max-w-7xl'
+            : 'max-w-xl sm:max-w-2xl'
         }`}
       >
         <canvas
@@ -916,11 +976,13 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           height={device.canvasHeight}
           onPointerDown={handleCanvasPointerDown}
           style={{
-            aspectRatio: device.aspectRatio === '16:9' ? '16 / 9' : '3 / 2',
-            maxHeight: isPortraitEmulator ? '52vh' : device.isDesktop ? '76vh' : '65vh',
+            aspectRatio: device.aspectRatio === '16:9' ? '16 / 9' : device.aspectRatio === '1:1' ? '1 / 1' : '3 / 2',
+            height: isPortraitEmulator ? '100%' : undefined,
+            maxHeight: isPortraitEmulator ? '100%' : device.isDesktop ? '76vh' : '65vh',
+            maxWidth: '100%',
             touchAction: 'none',
           }}
-          className="w-full pixelated block cursor-pointer object-contain"
+          className="w-full h-full pixelated block cursor-pointer object-contain"
         />
 
         {/* Floating Pixel Interaction Prompt (Only shown near object or door) */}
@@ -967,19 +1029,35 @@ export const GameViewport: React.FC<GameViewportProps> = ({
           <>
             <div className="absolute bottom-3 left-3 z-30 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto">
               {controlType === 'joystick' ? (
-                <VirtualJoystick
-                  onMove={(vec) => { joystickVectorRef.current = vec; }}
-                  onRelease={() => { joystickVectorRef.current = { x: 0, y: 0 }; }}
-                  disabled={isLocked}
-                />
+                <div className="flex flex-col items-start gap-1">
+                  <button
+                    onClick={() => { sounds.playSelect(); setControlType('tap'); }}
+                    className="px-2 py-0.5 bg-slate-950/90 hover:bg-slate-800 border border-amber-400/80 rounded-sm font-pixel text-[8px] sm:text-[9px] text-amber-300 shadow-lg cursor-pointer flex items-center gap-1 active:scale-95"
+                    title="Switch to Tap to Move"
+                  >
+                    <span>🕹️ STICK</span>
+                    <span className="text-slate-400">➔</span>
+                    <span>👆 TAP</span>
+                  </button>
+                  <VirtualJoystick
+                    onMove={(vec) => { joystickVectorRef.current = vec; }}
+                    onRelease={() => { joystickVectorRef.current = { x: 0, y: 0 }; }}
+                    disabled={isLocked}
+                  />
+                </div>
               ) : (
-                <button
-                  onClick={() => { sounds.playSelect(); setControlType('joystick'); }}
-                  className="px-3 py-2 bg-slate-950/90 border-2 border-amber-400 rounded-sm font-pixel text-[10px] text-amber-300 shadow-xl cursor-pointer flex items-center gap-1"
-                >
-                  <span>👆 TAP ACTIVE</span>
-                  <span className="text-[8px] text-slate-400">➔ 🕹️ STICK</span>
-                </button>
+                <div className="flex flex-col items-start gap-1">
+                  <button
+                    onClick={() => { sounds.playSelect(); setControlType('joystick'); }}
+                    className="px-2.5 py-1.5 bg-slate-950/95 border-2 border-amber-400 rounded-sm font-pixel text-[9px] text-amber-300 shadow-xl cursor-pointer flex items-center gap-1 active:scale-95"
+                  >
+                    <span>👆 TAP ACTIVE</span>
+                    <span className="text-[7px] text-slate-400">➔ 🕹️ STICK</span>
+                  </button>
+                  <span className="text-[7px] font-pixel text-slate-400 bg-black/80 px-1.5 py-0.5 rounded">
+                    Tap floor to walk
+                  </span>
+                </div>
               )}
             </div>
             <div className="absolute bottom-3 right-3 z-30 flex flex-col gap-2 items-end opacity-90 hover:opacity-100 transition-opacity pointer-events-auto">
@@ -1045,95 +1123,152 @@ export const GameViewport: React.FC<GameViewportProps> = ({
 
       {/* 2. Lower Handheld Emulator Control Deck (Dedicated Bottom Controller Panel in Portrait) */}
       {isPortraitEmulator && !isLocked && (
-        <div className="w-full max-w-xl sm:max-w-2xl flex justify-between items-center px-3 py-2 sm:px-5 sm:py-3 bg-gradient-to-b from-[#16152a] to-[#0c0b18] border-2 border-slate-800 pixel-box shadow-2xl mt-auto mb-1 rounded-sm touch-none select-none">
-          {/* Left: Virtual Joystick OR Tap-To-Move Active Badge */}
-          <div className="flex items-center justify-center shrink-0">
-            {controlType === 'joystick' ? (
-              <VirtualJoystick
-                onMove={(vec) => {
-                  joystickVectorRef.current = vec;
+        <div className="w-full max-w-xl sm:max-w-2xl flex flex-col justify-between shrink-0 h-[46dvh] max-h-[380px] min-h-[250px] bg-gradient-to-b from-[#1c1b36] via-[#141328] to-[#0a0914] border-4 border-t-0 border-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.9)] rounded-b-xl px-3 py-2 sm:px-5 sm:py-3 select-none touch-none">
+          {/* Top Console Bevel & Branding Strip */}
+          <div className="w-full flex justify-between items-center pb-1 border-b border-slate-700/60 text-[8px] font-pixel text-slate-400">
+            <div className="flex items-center gap-1 opacity-60">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+            </div>
+            <div className="flex items-center gap-1.5 tracking-wider font-bold text-amber-300/90">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.8)] animate-pulse" />
+              <span>KANA POCKET</span>
+            </div>
+            <div className="opacity-60 flex items-center gap-1">
+              <span className="text-[7px] text-slate-400">DELTA</span>
+            </div>
+          </div>
+
+          {/* Main Handheld Controls Row */}
+          <div className="w-full flex justify-between items-center py-1 gap-2 flex-1">
+            {/* Left Directional Controls (Stick / D-Pad / Tap) */}
+            <div className="flex items-center justify-center shrink-0">
+              {controlType === 'joystick' ? (
+                <VirtualJoystick
+                  onMove={(vec) => {
+                    joystickVectorRef.current = vec;
+                  }}
+                  onRelease={() => {
+                    joystickVectorRef.current = { x: 0, y: 0 };
+                  }}
+                  disabled={isLocked}
+                />
+              ) : controlType === 'dpad' ? (
+                <div
+                  onPointerDown={handleDpadPointerDown}
+                  onPointerMove={handleDpadPointerMove}
+                  onPointerUp={handleDpadPointerUp}
+                  onPointerCancel={handleDpadPointerUp}
+                  className="relative w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] rounded-full bg-slate-950/95 border-4 border-slate-700 shadow-2xl flex items-center justify-center select-none touch-none cursor-pointer"
+                  style={{ touchAction: 'none' }}
+                >
+                  {/* Up wing */}
+                  <div className="absolute top-1 w-9 h-10 bg-gradient-to-t from-slate-800 to-slate-700 rounded-t border-t-2 border-x-2 border-slate-500 flex items-start justify-center pt-0.5">
+                    <span className="text-[8px] font-pixel text-slate-300">▲</span>
+                  </div>
+                  {/* Down wing */}
+                  <div className="absolute bottom-1 w-9 h-10 bg-gradient-to-b from-slate-800 to-slate-700 rounded-b border-b-2 border-x-2 border-slate-500 flex items-end justify-center pb-0.5">
+                    <span className="text-[8px] font-pixel text-slate-300">▼</span>
+                  </div>
+                  {/* Left wing */}
+                  <div className="absolute left-1 w-10 h-9 bg-gradient-to-l from-slate-800 to-slate-700 rounded-l border-l-2 border-y-2 border-slate-500 flex items-center justify-start pl-0.5">
+                    <span className="text-[8px] font-pixel text-slate-300">◀</span>
+                  </div>
+                  {/* Right wing */}
+                  <div className="absolute right-1 w-10 h-9 bg-gradient-to-r from-slate-800 to-slate-700 rounded-r border-r-2 border-y-2 border-slate-500 flex items-center justify-end pr-0.5">
+                    <span className="text-[8px] font-pixel text-slate-300">▶</span>
+                  </div>
+                  {/* Center Pivot */}
+                  <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-600 shadow-inner flex items-center justify-center z-10 pointer-events-none">
+                    <div className="w-3.5 h-3.5 rounded-full bg-slate-900 border border-slate-700" />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] rounded-xl bg-slate-950/95 border-2 border-amber-500/70 flex flex-col items-center justify-center p-2 text-center shadow-lg">
+                  <span className="text-2xl animate-pulse">👆</span>
+                  <span className="text-[9px] text-amber-300 font-bold mt-1">TAP TO MOVE</span>
+                  <span className="text-[7px] text-slate-400 mt-0.5 leading-tight">Tap floor to walk</span>
+                </div>
+              )}
+            </div>
+
+            {/* Center Console Controls (Pill Mode Toggles & Retro Speaker) */}
+            <div className="flex flex-col items-center justify-center gap-2 mx-1 sm:mx-2">
+              <button
+                onClick={() => {
+                  sounds.playSelect();
+                  setControlType((prev) => (prev === 'joystick' ? 'dpad' : prev === 'dpad' ? 'tap' : 'joystick'));
                 }}
-                onRelease={() => {
-                  joystickVectorRef.current = { x: 0, y: 0 };
+                className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-[8px] sm:text-[9px] font-pixel text-yellow-300 border border-amber-500/70 rounded-full cursor-pointer active:scale-95 shadow-md flex items-center gap-1"
+                title="Switch directional controls (Stick / D-Pad / Tap Move)"
+              >
+                <span>{controlType === 'joystick' ? '🕹️ STICK' : controlType === 'dpad' ? '🎮 D-PAD' : '👆 TAP'}</span>
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playSelect();
+                  device.toggleAspectRatio();
                 }}
-                disabled={isLocked}
-              />
-            ) : (
-              <div className="w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] rounded-xl bg-slate-950/95 border-2 border-amber-500/70 flex flex-col items-center justify-center p-2 text-center shadow-lg">
-                <span className="text-2xl animate-pulse">👆</span>
-                <span className="text-[9px] text-amber-300 font-bold mt-1">TAP TO MOVE</span>
-                <span className="text-[7px] text-slate-400 mt-0.5 leading-tight">Tap floor to walk</span>
+                className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-[8px] font-pixel text-cyan-300 border border-slate-700 rounded-full cursor-pointer active:scale-95 shadow-md"
+                title="Toggle Screen Ratio"
+              >
+                📱 {device.aspectRatio}
+              </button>
+              {/* Acoustic Speaker Grill Relief */}
+              <div className="flex items-center gap-1 opacity-30 mt-0.5">
+                <div className="w-1 h-3 rounded-full bg-slate-400 rotate-12" />
+                <div className="w-1 h-3 rounded-full bg-slate-400 rotate-12" />
+                <div className="w-1 h-3 rounded-full bg-slate-400 rotate-12" />
               </div>
-            )}
-          </div>
+            </div>
 
-          {/* Center: Controller Mode & Ratio Toggles */}
-          <div className="flex flex-col items-center gap-2 mx-1 sm:mx-2">
-            <button
-              onClick={() => {
-                sounds.playSelect();
-                setControlType((prev) => (prev === 'joystick' ? 'tap' : 'joystick'));
-              }}
-              className="px-2.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-[8px] sm:text-[9px] font-pixel text-yellow-300 border border-amber-500/70 rounded cursor-pointer active:scale-95 shadow-sm"
-              title="Toggle between Virtual Joystick and Tap to Move"
-            >
-              {controlType === 'joystick' ? '🕹️ STICK' : '👆 TAP MOVE'}
-            </button>
-            <button
-              onClick={() => {
-                sounds.playSelect();
-                device.togglePreference();
-              }}
-              className="px-2 py-1 bg-slate-900 hover:bg-slate-800 text-[8px] font-pixel text-cyan-300 border border-slate-700 rounded cursor-pointer active:scale-95 shadow-sm"
-              title="Toggle Screen Ratio"
-            >
-              📱 {device.aspectRatio}
-            </button>
-          </div>
+            {/* Right Arcade Buttons (Diagonal Ergonomic Layout) */}
+            <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
+              {/* Bag [I] Button */}
+              <button
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  sounds.playSelect();
+                  onOpenInventory();
+                }}
+                className="w-13 h-13 sm:w-15 sm:h-15 rounded-full bg-gradient-to-b from-indigo-600 via-indigo-700 to-indigo-950 border-3 border-indigo-300 text-white font-pixel text-[8px] sm:text-[9px] shadow-[0_6px_16px_rgba(0,0,0,0.6),inset_0_2px_4px_rgba(255,255,255,0.3)] active:translate-y-0.5 active:scale-95 cursor-pointer flex flex-col items-center justify-center transition-all"
+                title="Open Kana Bag [I]"
+              >
+                <span className="text-base sm:text-lg">🎒</span>
+                <span>BAG</span>
+              </button>
 
-          {/* Right: Handheld Arcade Action Buttons */}
-          <div className="flex items-center gap-2.5 sm:gap-4 shrink-0">
-            {/* Bag [I] Button */}
-            <button
-              onPointerDown={(e) => {
-                e.preventDefault();
-                sounds.playSelect();
-                onOpenInventory();
-              }}
-              className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-b from-indigo-700 to-indigo-950 border-2 sm:border-3 border-indigo-400 text-white font-pixel text-[8px] sm:text-[9px] shadow-xl active:scale-95 cursor-pointer flex flex-col items-center justify-center transition-all"
-              title="Open Kana Bag [I]"
-            >
-              <span className="text-base sm:text-lg">🎒</span>
-              <span>BAG</span>
-            </button>
-
-            {/* Action [E] Button */}
-            <button
-              onPointerDown={(e) => {
-                e.preventDefault();
-                handleVirtualInteract();
-              }}
-              className={`w-15 h-15 sm:w-17 sm:h-17 rounded-full border-3 sm:border-4 font-pixel text-xs font-bold shadow-2xl active:scale-95 flex flex-col items-center justify-center cursor-pointer transition-all ${
-                isNearEntrance
-                  ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(245,158,11,0.85)]'
-                  : isNearDoor
-                  ? (isDoorUnlocked ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(16,185,129,0.85)]' : 'bg-gradient-to-b from-yellow-400 to-amber-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(250,204,21,0.85)]')
-                  : nearbyInteractable
-                  ? 'bg-gradient-to-b from-cyan-400 to-blue-600 border-white text-black animate-pulse shadow-[0_0_16px_rgba(34,211,238,0.85)]'
-                  : nearbyTableId
-                  ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_16px_rgba(245,158,11,0.85)]'
-                  : 'bg-gradient-to-b from-slate-800 to-slate-950 border-slate-500 text-slate-200 active:bg-indigo-700 shadow-md'
-              }`}
-              title="Interact / Action [E]"
-            >
-              <span className="text-sm font-bold">[E]</span>
-              <span className="text-[7px] tracking-tight">
-                {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'ENTER' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : nearbyTableId ? 'EXHIBIT' : 'ACTION'}
-              </span>
-            </button>
+              {/* Action [E] Button */}
+              <button
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  handleVirtualInteract();
+                }}
+                className={`w-17 h-17 sm:w-19 sm:h-19 rounded-full border-4 font-pixel text-xs font-bold shadow-[0_8px_20px_rgba(0,0,0,0.7),inset_0_2px_4px_rgba(255,255,255,0.4)] active:translate-y-0.5 active:scale-95 flex flex-col items-center justify-center cursor-pointer transition-all ${
+                  isNearEntrance
+                    ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_18px_rgba(245,158,11,0.9)]'
+                    : isNearDoor
+                    ? (isDoorUnlocked ? 'bg-gradient-to-b from-emerald-500 to-emerald-700 border-white text-white animate-pulse shadow-[0_0_18px_rgba(16,185,129,0.9)]' : 'bg-gradient-to-b from-yellow-400 to-amber-600 border-white text-black animate-pulse shadow-[0_0_18px_rgba(250,204,21,0.9)]')
+                    : nearbyInteractable
+                    ? 'bg-gradient-to-b from-cyan-400 to-blue-600 border-white text-black animate-pulse shadow-[0_0_18px_rgba(34,211,238,0.9)]'
+                    : nearbyTableId
+                    ? 'bg-gradient-to-b from-amber-500 to-amber-700 border-white text-white animate-pulse shadow-[0_0_18px_rgba(245,158,11,0.9)]'
+                    : 'bg-gradient-to-b from-slate-700 via-slate-800 to-slate-950 border-slate-500 text-slate-200 active:bg-indigo-700 shadow-md'
+                }`}
+                title="Interact / Action [E]"
+              >
+                <span className="text-sm font-bold">[E]</span>
+                <span className="text-[7px] tracking-tight">
+                  {isNearEntrance ? `ROOM ${room.number - 1}` : isNearDoor ? (isDoorUnlocked ? 'ENTER' : 'EXAMINE') : nearbyInteractable ? 'PLAY' : nearbyTableId ? 'EXHIBIT' : 'ACTION'}
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 };
+
+export const GameViewport = React.memo(GameViewportComponent);

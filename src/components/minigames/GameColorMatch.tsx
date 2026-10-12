@@ -210,7 +210,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         onTouchMove={(e) => draggingLeftId && updateMouse(e)}
         onMouseUp={handleGlobalUp}
         onTouchEnd={handleBoardTouchEnd}
-        className="relative bg-slate-950 p-4 sm:p-7 border-4 border-slate-700 shadow-2xl w-full h-[370px] sm:h-[410px] flex justify-between items-center overflow-hidden touch-none"
+        className="relative bg-slate-950 p-2 sm:p-5 border-4 border-slate-700 shadow-2xl w-full h-[260px] sm:h-[340px] md:h-[380px] flex justify-between items-center overflow-hidden touch-none"
       >
         {/* SVG Flexible Wires Layer: Exact coordinate match */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
@@ -283,18 +283,18 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         </svg>
 
         {/* Left Input Terminals (English) */}
-        <div className="flex flex-col gap-4 sm:gap-5 z-20">
+        <div className="flex flex-col gap-1.5 sm:gap-4 md:gap-5 z-20">
           {leftNodes.map((node) => {
             const isConnected = !!connections[node.id];
             const isSelected = draggingLeftId === node.id;
             return (
-              <div key={node.id} className="flex items-center gap-2 sm:gap-2.5">
+              <div key={node.id} className="flex items-center gap-1.5 sm:gap-2.5">
                 <div
                   ref={(el) => { leftPinRefs.current[node.id] = el; }}
                   onMouseDown={(e) => handleStartDrag(node.id, e)}
                   onTouchStart={(e) => handleStartDrag(node.id, e)}
                   onClick={() => isConnected ? removeConnection(node.id) : handleLeftPinClick(node.id)}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center font-bold cursor-pointer transition-transform ${
+                  className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center font-bold cursor-pointer transition-transform ${
                     isSelected
                       ? 'ring-4 ring-yellow-300 scale-110 shadow-xl'
                       : isConnected
@@ -304,9 +304,9 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                   style={{ backgroundColor: node.color, borderColor: node.borderColor }}
                   title={`${node.english} (${node.symbol})`}
                 >
-                  <span className="text-black font-extrabold text-xs sm:text-sm">{node.symbol}</span>
+                  <span className="text-black font-extrabold text-[10px] sm:text-xs md:text-sm">{node.symbol}</span>
                 </div>
-                <span className="text-xs sm:text-sm text-slate-200 font-mono tracking-wider font-bold">
+                <span className="text-[10px] sm:text-xs md:text-sm text-slate-200 font-mono tracking-wider font-bold">
                   {node.english}
                 </span>
               </div>
@@ -315,29 +315,29 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         </div>
 
         {/* Right Output Terminals (Japanese Vocabulary + Pronunciation) */}
-        <div className="flex flex-col gap-4 sm:gap-5 z-20">
+        <div className="flex flex-col gap-1.5 sm:gap-4 md:gap-5 z-20">
           {rightNodes.map((node) => {
             const isConnectedToMe = Object.values(connections).includes(node.id);
             return (
-              <div key={node.id} className="flex items-center gap-2 sm:gap-2.5">
+              <div key={node.id} className="flex items-center justify-end gap-1.5 sm:gap-2">
                 {/* Japanese Name & English Pronunciation Text */}
-                <div className="flex flex-col items-end text-right">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex flex-col items-end text-right min-w-[65px] sm:min-w-[85px]">
+                  <div className="flex items-center justify-end gap-1 w-full">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         sounds.speakJapanese(node.kana);
                       }}
-                      className="text-slate-400 hover:text-yellow-300 active:scale-125 text-xs transition-transform p-0.5 cursor-pointer"
+                      className="text-slate-400 hover:text-yellow-300 active:scale-125 text-xs transition-transform p-0.5 cursor-pointer shrink-0"
                       title={`Listen pronunciation for ${node.english}`}
                     >
                       🔊
                     </button>
-                    <span className="font-kana text-xs sm:text-sm font-bold text-slate-100 tracking-wider">
-                      {node.kana} <span className="text-[10px] sm:text-xs text-slate-400 font-normal">({node.kanji})</span>
+                    <span className="font-kana text-[11px] sm:text-xs md:text-sm font-bold text-slate-100 tracking-wider">
+                      {node.kana}
                     </span>
                   </div>
-                  <span className="text-[10px] sm:text-xs font-mono text-cyan-300 font-bold tracking-wider">
+                  <span className="text-[9px] sm:text-[10px] md:text-xs font-mono text-cyan-300 font-bold tracking-wider">
                     /{node.romaji}/
                   </span>
                 </div>
@@ -354,7 +354,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                       sounds.speakJapanese(node.kana);
                     }
                   }}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center font-bold cursor-pointer transition-transform ${
+                  className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center font-bold cursor-pointer transition-transform ${
                     isConnectedToMe
                       ? 'ring-4 ring-emerald-400 scale-105 shadow-xl'
                       : 'hover:scale-110 shadow-lg'
@@ -366,7 +366,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                   title={`${node.english} -> ${node.kana} (${node.romaji})`}
                 >
                   <span
-                    className={`font-kana font-extrabold text-sm sm:text-base ${
+                    className={`font-kana font-extrabold text-xs sm:text-sm md:text-base ${
                       isConnectedToMe ? 'text-black font-black' : 'text-slate-200'
                     }`}
                   >

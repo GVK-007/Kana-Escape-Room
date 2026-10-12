@@ -2,27 +2,26 @@ import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { InteractableObject } from '../../types/game';
 import { sounds } from '../../utils/audio';
 
-// Lazy-load every minigame dynamically only when its modal is opened
-const Game2048 = React.lazy(() => import('./Game2048').then((m) => ({ default: m.Game2048 })));
-const GameSnake = React.lazy(() => import('./GameSnake').then((m) => ({ default: m.GameSnake })));
-const GameFlappy = React.lazy(() => import('./GameFlappy').then((m) => ({ default: m.GameFlappy })));
-const GameColorMatch = React.lazy(() => import('./GameColorMatch').then((m) => ({ default: m.GameColorMatch })));
-const GameTimedCode = React.lazy(() => import('./GameTimedCode').then((m) => ({ default: m.GameTimedCode })));
-const GamePatternMemory = React.lazy(() => import('./GamePatternMemory').then((m) => ({ default: m.GamePatternMemory })));
-const GameKanaCatcher = React.lazy(() => import('./GameKanaCatcher').then((m) => ({ default: m.GameKanaCatcher })));
-const GameWallBreaker = React.lazy(() => import('./GameWallBreaker').then((m) => ({ default: m.GameWallBreaker })));
-const GameTicTacToe = React.lazy(() => import('./GameTicTacToe').then((m) => ({ default: m.GameTicTacToe })));
-const GamePong = React.lazy(() => import('./GamePong').then((m) => ({ default: m.GamePong })));
-const GameMatch3 = React.lazy(() => import('./GameMatch3').then((m) => ({ default: m.GameMatch3 })));
-const GameNutsAndBolts = React.lazy(() => import('./GameNutsAndBolts').then((m) => ({ default: m.GameNutsAndBolts })));
-const GameSlidingPuzzle = React.lazy(() => import('./GameSlidingPuzzle').then((m) => ({ default: m.GameSlidingPuzzle })));
-const GameLaneRunner = React.lazy(() => import('./GameLaneRunner').then((m) => ({ default: m.GameLaneRunner })));
-const GameRockPaperScissors = React.lazy(() => import('./GameRockPaperScissors').then((m) => ({ default: m.GameRockPaperScissors })));
-const GameSeaBattle = React.lazy(() => import('./GameSeaBattle').then((m) => ({ default: m.GameSeaBattle })));
-const GameDarts = React.lazy(() => import('./GameDarts').then((m) => ({ default: m.GameDarts })));
-const GameAngryBirds = React.lazy(() => import('./GameAngryBirds').then((m) => ({ default: m.GameAngryBirds })));
-const GameDotsAndBoxes = React.lazy(() => import('./GameDotsAndBoxes').then((m) => ({ default: m.GameDotsAndBoxes })));
-const GameCardMatch = React.lazy(() => import('./GameCardMatch').then((m) => ({ default: m.GameCardMatch })));
+import { Game2048 } from './Game2048';
+import { GameSnake } from './GameSnake';
+import { GameFlappy } from './GameFlappy';
+import { GameColorMatch } from './GameColorMatch';
+import { GameTimedCode } from './GameTimedCode';
+import { GamePatternMemory } from './GamePatternMemory';
+import { GameKanaCatcher } from './GameKanaCatcher';
+import { GameWallBreaker } from './GameWallBreaker';
+import { GameTicTacToe } from './GameTicTacToe';
+import { GamePong } from './GamePong';
+import { GameMatch3 } from './GameMatch3';
+import { GameNutsAndBolts } from './GameNutsAndBolts';
+import { GameSlidingPuzzle } from './GameSlidingPuzzle';
+import { GameLaneRunner } from './GameLaneRunner';
+import { GameRockPaperScissors } from './GameRockPaperScissors';
+import { GameSeaBattle } from './GameSeaBattle';
+import { GameDarts } from './GameDarts';
+import { GameAngryBirds } from './GameAngryBirds';
+import { GameDotsAndBoxes } from './GameDotsAndBoxes';
+import { GameCardMatch } from './GameCardMatch';
 
 interface MiniGameModalProps {
   interactable: InteractableObject;
@@ -37,6 +36,24 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
 }) => {
   // Universal minigame reset key
   const [resetKey, setResetKey] = useState(0);
+
+  // Dynamic viewport scaling to guarantee minigames fit on mobile horizontal screens without scrolling
+  const [windowSize, setWindowSize] = useState({
+    width: typeof window !== 'undefined' ? window.innerWidth : 1000,
+    height: typeof window !== 'undefined' ? window.innerHeight : 700,
+  });
+
+  useEffect(() => {
+    const onResize = () => {
+      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+    };
+  }, []);
 
   const handleReset = useCallback(() => {
     sounds.playSelect();
@@ -113,9 +130,26 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
     }
   };
 
+  const isShortScreen = windowSize.height < 560;
+  const isLandscape = windowSize.width > windowSize.height;
+  const targetH = isShortScreen && isLandscape ? 430 : 490;
+  const targetW = isShortScreen && isLandscape ? 620 : 680;
+  const availH = Math.max(240, windowSize.height - 12);
+  const availW = Math.max(300, windowSize.width - 16);
+  const scale = Math.min(1, availH / targetH, availW / targetW);
+  const shouldScale = scale < 0.98;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-1.5 sm:p-4 select-none">
-      <div className="relative bg-[#1a192f] border-4 border-[#3b3a58] pixel-box p-3 sm:p-5 max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full flex flex-col items-center shadow-2xl max-h-[96dvh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-1 select-none overflow-hidden">
+      <div
+        style={{
+          transform: shouldScale ? `scale(${scale})` : undefined,
+          transformOrigin: 'center center',
+        }}
+        className={`relative bg-[#1a192f] border-4 border-[#3b3a58] pixel-box p-2.5 sm:p-5 max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full flex flex-col items-center shadow-2xl ${
+          shouldScale ? 'overflow-hidden' : 'max-h-[96dvh] overflow-y-auto'
+        }`}
+      >
         {/* Compact Cabinet Header with integrated Reward indicator */}
         <div className="flex justify-between items-center w-full pb-2 border-b-2 border-slate-700/80 mb-2 sm:mb-3">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
@@ -161,21 +195,9 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
           </div>
         </div>
 
-        {/* Active Minigame with natural flex-col flow (prevents vertical centering overlaps) */}
-        <div className="w-full flex flex-col items-center justify-start py-1">
-          <Suspense
-            key={resetKey}
-            fallback={
-              <div className="flex flex-col items-center justify-center p-8 gap-2">
-                <div className="w-6 h-6 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
-                <span className="font-pixel text-[10px] text-yellow-400 tracking-widest animate-pulse">
-                  INITIALIZING MODULE...
-                </span>
-              </div>
-            }
-          >
-            {renderGame()}
-          </Suspense>
+        {/* Active Minigame with natural flex-col flow (instant local load) */}
+        <div key={resetKey} className="w-full flex flex-col items-center justify-start py-1">
+          {renderGame()}
         </div>
 
         {/* Footer controls reminder - responsive and collision-free */}

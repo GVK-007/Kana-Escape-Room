@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
 export type DeviceType = 'mobile' | 'tablet' | 'desktop';
-export type AspectRatioMode = '16:9' | '3:2';
+export type AspectRatioMode = '16:9' | '3:2' | '1:1';
 export type AspectPreference = 'auto' | 'pc' | 'mobile';
 
 export interface DeviceModeInfo {
@@ -18,6 +18,7 @@ export interface DeviceModeInfo {
   preference: AspectPreference;
   setPreference: (pref: AspectPreference) => void;
   togglePreference: () => void;
+  toggleAspectRatio: () => void;
 }
 
 const STORAGE_KEY = 'kana_aspect_preference';
@@ -66,6 +67,9 @@ export function useDeviceMode(): DeviceModeInfo {
     }
   }, []);
 
+  const [portraitRatio, setPortraitRatio] = useState<'1:1' | '3:2'>('1:1');
+  const [landscapeRatio, setLandscapeRatio] = useState<'16:9' | '3:2'>('16:9');
+
   const togglePreference = useCallback(() => {
     setPreferenceState((prev) => {
       const next: AspectPreference = prev === 'auto' ? 'pc' : prev === 'pc' ? 'mobile' : 'auto';
@@ -84,6 +88,14 @@ export function useDeviceMode(): DeviceModeInfo {
   const isTouch = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
   const coarsePointer = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const isPortrait = height > width;
+
+  const toggleAspectRatio = useCallback(() => {
+    if (isPortrait) {
+      setPortraitRatio((prev) => (prev === '1:1' ? '3:2' : '1:1'));
+    } else {
+      setLandscapeRatio((prev) => (prev === '16:9' ? '3:2' : '16:9'));
+    }
+  }, [isPortrait]);
 
   // Auto detection
   const detectedIsMobile = width < 768 || (isTouch && width < 900 && coarsePointer);
@@ -113,26 +125,37 @@ export function useDeviceMode(): DeviceModeInfo {
   let canvasHeight = 540;
   let scale = 2.65;
 
-  if (isMobile) {
-    if (isPortrait) {
-      aspectRatio = '3:2';
-      canvasWidth = 720;
-      canvasHeight = 540;
-      scale = 3.85;
+  if (isPortrait || (isMobile && !isDesktop && isPortrait)) {
+    if (portraitRatio === '1:1') {
+      aspectRatio = '1:1';
+      canvasWidth = 360;
+      canvasHeight = 360;
+      scale = 3.8;
     } else {
-      aspectRatio = '16:9';
+      aspectRatio = '3:2';
+      canvasWidth = 360;
+      canvasHeight = 240;
+      scale = 3.8;
+    }
+  } else if (isMobile) {
+    aspectRatio = landscapeRatio;
+    if (landscapeRatio === '3:2') {
+      canvasWidth = 675;
+      canvasHeight = 450;
+      scale = 2.4;
+    } else {
       canvasWidth = 800;
       canvasHeight = 450;
       scale = 2.4;
     }
   } else if (isTablet) {
-    aspectRatio = '16:9';
+    aspectRatio = landscapeRatio;
     canvasWidth = 896;
     canvasHeight = 504;
     scale = 2.55;
   } else {
     // Desktop PC: expansive 16:9 widescreen canvas
-    aspectRatio = '16:9';
+    aspectRatio = landscapeRatio;
     canvasWidth = 960;
     canvasHeight = 540;
     scale = 2.65;
@@ -152,5 +175,6 @@ export function useDeviceMode(): DeviceModeInfo {
     preference,
     setPreference,
     togglePreference,
+    toggleAspectRatio,
   };
 }

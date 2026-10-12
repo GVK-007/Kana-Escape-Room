@@ -53,15 +53,12 @@ export const GameKanaCatcher: React.FC<GameKanaCatcherProps> = ({ onSuccess, tar
     let animId: number;
     let spawnTimer = 0;
     let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
     const colors = ['#f472b6', '#38bdf8', '#fbbf24', '#a78bfa', '#34d399'];
     const kanaSymbols = ['あ', 'い', 'う', 'え', 'お'];
 
-    const loop = (currentTime?: number) => {
-      const now = currentTime || performance.now();
-      const deltaMs = now - lastTime;
-      lastTime = now;
-      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
-
+    const updatePhysics = (dt: number = 1.0) => {
       const state = stateRef.current;
 
       // Input movement: smooth, steady 4.5 px/frame
@@ -123,6 +120,24 @@ export const GameKanaCatcher: React.FC<GameKanaCatcherProps> = ({ onSuccess, tar
           }
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const state = stateRef.current;
 
       // Render
       ctx.fillStyle = '#0f172a';

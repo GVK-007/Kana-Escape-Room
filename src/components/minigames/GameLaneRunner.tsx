@@ -79,13 +79,10 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
     let spawnCounter = 0;
     let lastHudTime = 0;
     let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
 
-    const loop = (currentTime?: number) => {
-      const now = currentTime || performance.now();
-      const deltaMs = now - lastTime;
-      lastTime = now;
-      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
-
+    const updatePhysics = (dt: number = 1.0, nowTime: number = performance.now()) => {
       const s = stateRef.current;
 
       if (!s.won && !s.gameOver) {
@@ -95,8 +92,8 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
         s.distance += (0.2 + progress * 0.25) * dt;
 
         // Throttle React state updates to 10Hz instead of 60Hz to save CPU
-        if (now - lastHudTime > 100) {
-          lastHudTime = now;
+        if (nowTime - lastHudTime > 100) {
+          lastHudTime = nowTime;
           setDistance(Math.floor(s.distance));
           setSpeedVal(`${(currentSpeed / 3.2).toFixed(1)}x`);
         }
@@ -143,6 +140,24 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
           setTimeout(() => onSuccessRef.current(), 750);
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0, now);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const s = stateRef.current;
 
       // Draw 3-lane track
       ctx.fillStyle = '#0f172a';

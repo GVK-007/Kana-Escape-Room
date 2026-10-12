@@ -234,6 +234,7 @@ export default function App() {
     setCraftedWords([]);
     setUnlockedDoors([]);
     setDisplayedItems({});
+    setRoomHints({});
     setSpawnDirection('forward');
     setPlaytimeSeconds(0);
     setTargetNextRoomIndex(0);
@@ -283,6 +284,7 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEY);
     setHasSaveData(false);
     setDisplayedItems({});
+    setRoomHints({});
     setShuffledRewards(generateShuffledRoomRewards(ROOMS));
     sounds.playFail();
   };
@@ -317,6 +319,21 @@ export default function App() {
   const isDoorUnlocked = unlockedDoors.includes(currentRoom.id);
 
   // Interaction handlers
+  const handleOpenInventory = useCallback(() => {
+    sounds.playSelect();
+    setGameState('INVENTORY');
+  }, []);
+
+  const handleOpenPauseMenu = useCallback(() => {
+    sounds.playSelect();
+    setGameState('PAUSED');
+  }, []);
+
+  const handleOpenDoorClue = useCallback(() => {
+    sounds.playSelect();
+    setGameState('DOOR_CLUE');
+  }, []);
+
   const handleInteract = useCallback((obj: InteractableObject) => {
     setActiveInteractable(obj);
     setGameState('MINIGAME');
@@ -487,18 +504,9 @@ export default function App() {
             inventory={inventory}
             isDoorUnlocked={isDoorUnlocked}
             onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
-            onOpenInventory={() => {
-              sounds.playSelect();
-              setGameState('INVENTORY');
-            }}
-            onOpenPauseMenu={() => {
-              sounds.playSelect();
-              setGameState('PAUSED');
-            }}
-            onOpenDoorClue={() => {
-              sounds.playSelect();
-              setGameState('DOOR_CLUE');
-            }}
+            onOpenInventory={handleOpenInventory}
+            onOpenPauseMenu={handleOpenPauseMenu}
+            onOpenDoorClue={handleOpenDoorClue}
           />
 
           {/* Main 2D Pixel-Art Game Viewport */}
@@ -513,8 +521,8 @@ export default function App() {
               onInteract={handleInteract}
               onInteractDoor={handleInteractDoor}
               onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
-              onOpenInventory={() => setGameState('INVENTORY')}
-              onOpenPauseMenu={() => setGameState('PAUSED')}
+              onOpenInventory={handleOpenInventory}
+              onOpenPauseMenu={handleOpenPauseMenu}
               onDebugGiveKana={handleDebugGiveKana}
               onDebugUnlockDoor={handleDebugUnlockDoor}
               displayedItems={displayedItems}

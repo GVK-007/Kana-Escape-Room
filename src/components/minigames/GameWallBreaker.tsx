@@ -135,13 +135,10 @@ export const GameWallBreaker: React.FC<GameWallBreakerProps> = ({ onSuccess }) =
 
     let animId: number;
     let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
 
-    const loop = (currentTime?: number) => {
-      const now = currentTime || performance.now();
-      const deltaMs = now - lastTime;
-      lastTime = now;
-      const dt = Math.min(Math.max(deltaMs / (1000 / 60), 0.1), 3.0);
-
+    const updatePhysics = (dt: number = 1.0) => {
       const s = stateRef.current;
 
       // Handle paddle expand timer
@@ -321,6 +318,24 @@ export const GameWallBreaker: React.FC<GameWallBreakerProps> = ({ onSuccess }) =
           setTimeout(() => onSuccessRef.current(), 750);
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const s = stateRef.current;
 
       // Draw Arena
       ctx.fillStyle = '#0a0a1a';
