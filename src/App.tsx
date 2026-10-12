@@ -476,7 +476,7 @@ export default function App() {
     sounds.playKanaObtained();
   };
 
-  const isPortraitEmulator = device.orientation === 'portrait' || (device.isMobile && !device.isDesktop);
+  const isPortraitEmulator = device.orientation === 'portrait';
 
   return (
     <main className={`w-screen ${isPortraitEmulator ? 'h-[100dvh]' : 'h-screen'} bg-[#0e0d1a] flex flex-col items-center justify-center relative overflow-hidden select-none`}>
@@ -494,8 +494,12 @@ export default function App() {
         />
       ) : (
         <div
-          className={`w-full h-full flex flex-col items-center justify-between p-1 sm:p-3 transition-all ${
-            device.isDesktop ? 'max-w-7xl 2xl:max-w-[1536px]' : 'max-w-2xl sm:max-w-4xl'
+          className={`w-full h-full flex flex-col items-center justify-between p-1 sm:p-2 transition-all ${
+            isPortraitEmulator
+              ? 'max-w-2xl'
+              : device.isDesktop
+              ? 'max-w-7xl 2xl:max-w-[1536px]'
+              : 'w-full max-w-5xl 2xl:max-w-7xl'
           }`}
         >
           {/* Top Bar / HUD */}
@@ -510,7 +514,7 @@ export default function App() {
           />
 
           {/* Main 2D Pixel-Art Game Viewport */}
-          <div className={`flex-1 w-full flex flex-col items-center ${isPortraitEmulator ? 'h-full justify-between' : 'justify-start sm:justify-center my-auto'} overflow-hidden min-h-0`}>
+          <div className={`flex-1 w-full flex flex-col items-center ${isPortraitEmulator ? 'h-full justify-between' : 'justify-center my-auto'} overflow-hidden min-h-0`}>
             <GameViewport
               room={currentRoom}
               characterId={selectedCharacter}

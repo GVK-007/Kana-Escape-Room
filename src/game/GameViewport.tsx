@@ -956,18 +956,18 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
     displayedItems,
   ]);
 
-  const isPortraitEmulator = device.orientation === 'portrait' || (device.isMobile && !device.isDesktop);
+  const isPortraitEmulator = device.orientation === 'portrait';
 
   return (
-    <div className={`w-full flex flex-col items-center select-none ${isPortraitEmulator ? 'h-full flex-1 justify-between min-h-0' : ''}`}>
+    <div className={`w-full flex flex-col items-center select-none ${isPortraitEmulator ? 'h-full flex-1 justify-between min-h-0' : 'h-full justify-center my-auto'}`}>
       {/* 1. Upper Console Screen (Pure Game Viewport) */}
       <div
-        className={`relative flex flex-col items-center justify-center w-full transition-all bg-black border-4 border-slate-800 pixel-box shadow-2xl overflow-hidden rounded-t-sm ${
+        className={`relative flex flex-col items-center justify-center w-full transition-all bg-black border-4 border-slate-800 pixel-box shadow-2xl overflow-hidden ${
           isPortraitEmulator
-            ? 'flex-1 min-h-0'
+            ? 'flex-1 min-h-0 rounded-t-sm'
             : device.isDesktop
-            ? 'max-w-5xl lg:max-w-6xl 2xl:max-w-7xl'
-            : 'max-w-xl sm:max-w-2xl'
+            ? 'max-w-5xl lg:max-w-6xl 2xl:max-w-7xl rounded-sm'
+            : 'max-w-4xl lg:max-w-5xl 2xl:max-w-7xl rounded-sm'
         }`}
       >
         <canvas
@@ -978,11 +978,11 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
           style={{
             aspectRatio: device.aspectRatio === '16:9' ? '16 / 9' : device.aspectRatio === '1:1' ? '1 / 1' : '3 / 2',
             height: isPortraitEmulator ? '100%' : undefined,
-            maxHeight: isPortraitEmulator ? '100%' : device.isDesktop ? '76vh' : '65vh',
+            maxHeight: isPortraitEmulator ? '100%' : device.isDesktop ? '76vh' : '75vh',
             maxWidth: '100%',
             touchAction: 'none',
           }}
-          className="w-full h-full pixelated block cursor-pointer object-contain"
+          className={`w-full pixelated block cursor-pointer object-contain ${isPortraitEmulator ? 'h-full' : ''}`}
         />
 
         {/* Floating Pixel Interaction Prompt (Only shown near object or door) */}
@@ -1025,7 +1025,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
         )}
 
         {/* Landscape floating controls for mobile landscape only */}
-        {!isPortraitEmulator && !isLocked && showTouchControls && (
+        {!isPortraitEmulator && !isLocked && (showTouchControls || device.isMobile) && (
           <>
             <div className="absolute bottom-3 left-3 z-30 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto">
               {controlType === 'joystick' ? (
