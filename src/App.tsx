@@ -21,6 +21,7 @@ import { TableDisplayModal } from './components/ui/TableDisplayModal';
 import { ScreenTransition } from './components/ui/ScreenTransition';
 import { sounds } from './utils/audio';
 import { useDeviceMode } from './utils/useDeviceMode';
+import { computeSaveChecksum, getSaveData } from './utils/saveData';
 
 const STORAGE_KEY = 'kana_escape_room_save';
 
@@ -97,15 +98,23 @@ export default function App() {
 
   // Save detection
   const [hasSaveData, setHasSaveData] = useState(false);
+  const [isImportedRun, setIsImportedRun] = useState<boolean>(() => {
+    try {
+      const data = getSaveData();
+      return !!data?.isImported;
+    } catch {
+      return false;
+    }
+  });
 
   // Check saved state on mount
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed: GameSaveState = JSON.parse(raw);
-        if (parsed.currentRoomId) {
-          setHasSaveData(true);
+      const data = getSaveData();
+      if (data && data.currentRoomId) {
+        setHasSaveData(true);
+        if (data.isImported) {
+          setIsImportedRun(true);
         }
       }
     } catch {
@@ -130,7 +139,10 @@ export default function App() {
         shuffledRewards,
         roomHints,
         displayedItems,
+        isImported: isImportedRun,
+        version: 2,
       };
+      data.checksum = computeSaveChecksum(data);
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       setHasSaveData(true);
     } catch {
@@ -148,6 +160,7 @@ export default function App() {
     shuffledRewards,
     roomHints,
     displayedItems,
+    isImportedRun,
   ]);
 
   // Autosave when room/inventory/unlocked status changes during play
@@ -237,6 +250,7 @@ export default function App() {
     setRoomHints({});
     setSpawnDirection('forward');
     setPlaytimeSeconds(0);
+    setIsImportedRun(false);
     setTargetNextRoomIndex(0);
     setTransitionActive(true);
     setGameState('PLAYING');
@@ -246,9 +260,8 @@ export default function App() {
   // Continue from save with transition
   const handleContinueGame = () => {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const data: GameSaveState = JSON.parse(raw);
+      const data = getSaveData();
+      if (data) {
         const rIndex = ROOMS.findIndex((r) => r.id === data.currentRoomId);
         const targetIdx = rIndex !== -1 ? rIndex : 0;
         setCurrentRoomIndex(targetIdx);
@@ -262,6 +275,7 @@ export default function App() {
         setPlaytimeSeconds(data.playtimeSeconds || 0);
         setVolumeEnabled(data.volumeEnabled ?? true);
         sounds.setEnabled(data.volumeEnabled ?? true);
+        setIsImportedRun(!!data.isImported);
         if (data.shuffledRewards && Object.keys(data.shuffledRewards).length > 0) {
           setShuffledRewards(data.shuffledRewards);
         } else {
@@ -283,6 +297,7 @@ export default function App() {
   const handleResetSave = () => {
     localStorage.removeItem(STORAGE_KEY);
     setHasSaveData(false);
+    setIsImportedRun(false);
     setDisplayedItems({});
     setRoomHints({});
     setShuffledRewards(generateShuffledRoomRewards(ROOMS));
@@ -304,6 +319,7 @@ export default function App() {
     setPlaytimeSeconds(data.playtimeSeconds || 0);
     setVolumeEnabled(data.volumeEnabled ?? true);
     sounds.setEnabled(data.volumeEnabled ?? true);
+    setIsImportedRun(true);
     if (data.shuffledRewards && Object.keys(data.shuffledRewards).length > 0) {
       setShuffledRewards(data.shuffledRewards);
     } else {
@@ -611,6 +627,7 @@ export default function App() {
           playtimeSeconds={playtimeSeconds}
           selectedCharacter={selectedCharacter}
           craftedWords={craftedWords}
+          isImportedRun={isImportedRun}
           onPlayAgain={handleStartNewGame}
           onTitleScreen={() => setGameState('TITLE')}
         />
@@ -624,6 +641,7 @@ export default function App() {
           onOpenInventory={() => setGameState('INVENTORY')}
           onQuitToTitle={() => setGameState('TITLE')}
           onSaveImported={handleSaveImported}
+          isImportedRun={isImportedRun}
         />
       )}
 

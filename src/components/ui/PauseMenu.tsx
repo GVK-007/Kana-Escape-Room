@@ -11,6 +11,7 @@ interface PauseMenuProps {
   onOpenInventory: () => void;
   onQuitToTitle: () => void;
   onSaveImported?: (data: GameSaveState) => void;
+  isImportedRun?: boolean;
 }
 
 export const PauseMenu: React.FC<PauseMenuProps> = ({
@@ -20,6 +21,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
   onOpenInventory,
   onQuitToTitle,
   onSaveImported,
+  isImportedRun = false,
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
@@ -55,6 +57,13 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
         <h2 className="font-pixel text-base text-yellow-400 tracking-widest">
           — PAUSED —
         </h2>
+
+        {isImportedRun && (
+          <div className="bg-amber-950/80 border border-amber-600/70 px-2 py-1 text-[9px] font-pixel text-amber-300 flex items-center justify-center gap-1.5 w-full">
+            <span>⚠️</span>
+            <span>RESTORED SAVE (UNVERIFIED)</span>
+          </div>
+        )}
 
         {showControls ? (
           <div className="flex flex-col gap-3 w-full text-left bg-slate-950 p-4 border-2 border-slate-700 text-xs font-pixel text-slate-300">

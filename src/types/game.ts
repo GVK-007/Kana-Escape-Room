@@ -124,4 +124,8 @@ export interface GameSaveState {
   shuffledRewards?: Record<string, KanaItem>;
   roomHints?: Record<string, { revealedCount: number; lastHintTimestamp: number }>;
   displayedItems?: Record<string, string[]>; // tableId -> word strings
+  isImported?: boolean;
+  checksum?: string;
+  version?: number;
+  exportedAt?: number;
 }

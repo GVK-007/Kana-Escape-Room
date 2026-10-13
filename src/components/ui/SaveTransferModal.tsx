@@ -59,11 +59,17 @@ export const SaveTransferModal: React.FC<SaveTransferModalProps> = ({ onClose, o
     const res = importSaveData(importText);
     if (res.success && res.data) {
       sounds.playSuccess();
-      setMessage({ text: 'Save restored successfully!', type: 'success' });
+      const warningSummary = res.warnings && res.warnings.length > 0
+        ? ` (Adjustments made: ${res.warnings[0]})`
+        : '';
+      setMessage({
+        text: `Save restored successfully! Tagged as Unverified.${warningSummary}`,
+        type: 'success',
+      });
       setTimeout(() => {
         onSaveImported(res.data!);
         onClose();
-      }, 700);
+      }, 1200);
     } else {
       sounds.playFail();
       setMessage({ text: res.error || 'Failed to import.', type: 'error' });
@@ -160,6 +166,10 @@ export const SaveTransferModal: React.FC<SaveTransferModalProps> = ({ onClose, o
             <span className="text-slate-300 text-[11px] leading-relaxed">
               Upload a .json save file or paste raw save JSON text to restore your progress.
             </span>
+
+            <div className="bg-amber-950/70 border border-amber-600/70 p-2 text-[10px] text-amber-200/90 leading-tight">
+              ⚠️ <strong>Notice:</strong> Restored saves are validated and tagged as <em>Unverified</em>. They are excluded from competitive global speedrun leaderboards to maintain integrity.
+            </div>
 
             <label className="flex items-center justify-center py-2 px-3 bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 cursor-pointer text-[10px]">
               <span>📁 SELECT .JSON SAVE FILE</span>

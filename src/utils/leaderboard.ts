@@ -13,6 +13,8 @@ export interface LeaderboardEntry {
   craftedWords?: string[];
   timestamp: number;
   formattedDate: string;
+  isImported?: boolean;
+  verified?: boolean;
 }
 
 const LEADERBOARD_STORAGE_KEY = 'kana_escape_runs_leaderboard_v2';
@@ -79,16 +81,18 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
   const map = new Map<string, LeaderboardEntry>();
   serverEntries.forEach((e) => map.set(e.id, e));
 
-  // Sync any local-only run from this device up to the cloud
+  // Sync any local-only run from this device up to the cloud (only verified runs)
   local.forEach((e) => {
     if (!map.has(e.id)) {
       map.set(e.id, e);
-      // Background push to cloud so other devices immediately see it
-      fetch('/api/leaderboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(e),
-      }).catch(() => {});
+      if (!e.isImported && e.verified !== false) {
+        // Background push to cloud so other devices immediately see it
+        fetch('/api/leaderboard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(e),
+        }).catch(() => {});
+      }
     }
   });
 
@@ -131,6 +135,13 @@ export const sortLeaderboard = (
   category: LeaderboardCategory = 'time'
 ): LeaderboardEntry[] => {
   return [...entries].sort((a, b) => {
+    // Verified runs always rank higher than unverified / imported runs
+    const aVerified = !a.isImported && a.verified !== false;
+    const bVerified = !b.isImported && b.verified !== false;
+    if (aVerified !== bVerified) {
+      return aVerified ? -1 : 1;
+    }
+
     if (category === 'artifacts') {
       const artA = getEntryArtifactCount(a);
       const artB = getEntryArtifactCount(b);
@@ -177,6 +188,8 @@ export const saveLeaderboardEntry = (params: {
   characterId: CharacterId;
   roomsCleared?: number;
   craftedWords?: string[];
+  isImported?: boolean;
+  verified?: boolean;
 }): {
   entry: LeaderboardEntry;
   rank: number;
@@ -194,6 +207,9 @@ export const saveLeaderboardEntry = (params: {
   const now = new Date();
   const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear().toString().slice(-2)}`;
 
+  const isImportedRun = !!params.isImported;
+  const isVerified = !isImportedRun && params.verified !== false;
+
   const newEntry: LeaderboardEntry = {
     id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
     runName: cleanName,
@@ -206,6 +222,8 @@ export const saveLeaderboardEntry = (params: {
     craftedWords: params.craftedWords || [],
     timestamp: Date.now(),
     formattedDate,
+    isImported: isImportedRun,
+    verified: isVerified,
   };
 
   const combined = [...current.filter((e) => e.id !== newEntry.id), newEntry];
@@ -227,8 +245,8 @@ export const saveLeaderboardEntry = (params: {
     // ignore
   }
 
-  // Asynchronously broadcast new run to Cloudflare live leaderboard and persistent cloud backend
-  if (typeof window !== 'undefined' && typeof fetch !== 'undefined') {
+  // ONLY broadcast verified, non-imported runs to Cloudflare live leaderboard and persistent cloud backend
+  if (isVerified && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     fetch('/api/leaderboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -240,7 +258,7 @@ export const saveLeaderboardEntry = (params: {
           'Content-Type': 'application/json',
           'Security-key': GLOBAL_SECURITY_KEY,
         },
-        body: JSON.stringify({ runs: updated }),
+        body: JSON.stringify({ runs: updated.filter((e) => !e.isImported && e.verified !== false) }),
       }).catch(() => {});
     });
   }

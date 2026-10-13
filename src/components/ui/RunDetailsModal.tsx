@@ -57,6 +57,16 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, c
           </button>
         </div>
 
+        {/* Unverified Warning Badge */}
+        {(entry.isImported || entry.verified === false) && (
+          <div className="w-full bg-amber-950/80 border border-amber-600/70 p-2 flex items-center justify-center gap-1.5 text-center">
+            <span className="text-sm">⚠️</span>
+            <span className="font-pixel text-[9px] text-amber-300">
+              UNVERIFIED RUN — LOADED FROM BACKUP SAVE
+            </span>
+          </div>
+        )}
+
         {/* Stats Grid */}
         <div className="w-full grid grid-cols-4 gap-1.5 bg-slate-950/80 border border-slate-800 p-2.5 text-center">
           <div>

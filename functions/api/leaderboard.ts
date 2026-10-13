@@ -10,6 +10,8 @@ export interface LeaderboardEntry {
   craftedWords?: string[];
   timestamp: number;
   formattedDate: string;
+  isImported?: boolean;
+  verified?: boolean;
 }
 
 interface Env {
@@ -112,6 +114,62 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         status: 400,
         headers: CORS_HEADERS,
       });
+    }
+
+    // 1. Block imported or unverified runs from the global competitive leaderboard
+    if (newEntry.isImported || (newEntry as any).verified === false) {
+      return new Response(
+        JSON.stringify({ error: 'Imported/unverified runs are excluded from competitive global leaderboards.' }),
+        {
+          status: 403,
+          headers: CORS_HEADERS,
+        }
+      );
+    }
+
+    // 2. Server-side speedrun plausibility checks:
+    // Minimum humanly possible time for 3 escape rooms and minigames is >= 45 seconds
+    if (newEntry.playtimeSeconds < 45 || !Number.isInteger(newEntry.playtimeSeconds)) {
+      return new Response(
+        JSON.stringify({ error: 'Rejected: Implausibly low speedrun time detected.' }),
+        {
+          status: 400,
+          headers: CORS_HEADERS,
+        }
+      );
+    }
+
+    // 3. Must have cleared all 3 rooms
+    if (newEntry.roomsCleared !== 3) {
+      return new Response(
+        JSON.stringify({ error: 'Rejected: Incomplete run. All 3 rooms must be cleared.' }),
+        {
+          status: 400,
+          headers: CORS_HEADERS,
+        }
+      );
+    }
+
+    // 4. Must have crafted the final exit word 'でぐち'
+    if (!Array.isArray(newEntry.craftedWords) || !newEntry.craftedWords.includes('でぐち')) {
+      return new Response(
+        JSON.stringify({ error: 'Rejected: Missing required final exit word.' }),
+        {
+          status: 400,
+          headers: CORS_HEADERS,
+        }
+      );
+    }
+
+    // 5. Must have plausible collected kana count (at least 3 kana needed for exit)
+    if (typeof newEntry.totalKana !== 'number' || newEntry.totalKana < 3 || newEntry.totalKana > 30) {
+      return new Response(
+        JSON.stringify({ error: 'Rejected: Invalid kana item count.' }),
+        {
+          status: 400,
+          headers: CORS_HEADERS,
+        }
+      );
     }
 
     // 1. Fetch current runs

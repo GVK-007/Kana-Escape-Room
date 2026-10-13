@@ -401,6 +401,14 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                           YOU
                         </span>
                       ) : null}
+                      {entry.isImported || entry.verified === false ? (
+                        <span
+                          className="text-[7px] bg-amber-900/80 text-amber-300 border border-amber-600/60 px-1 rounded-xs font-sans font-semibold shrink-0"
+                          title="Restored from backup save (Unverified Run)"
+                        >
+                          UNVERIFIED
+                        </span>
+                      ) : null}
                     </div>
                     <span className="text-[8px] text-cyan-300/80 truncate">
                       {entry.characterName}

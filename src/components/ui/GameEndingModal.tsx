@@ -18,6 +18,7 @@ interface GameEndingModalProps {
   playtimeSeconds: number;
   selectedCharacter: CharacterId;
   craftedWords?: string[];
+  isImportedRun?: boolean;
   onPlayAgain: () => void;
   onTitleScreen: () => void;
 }
@@ -27,6 +28,7 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
   playtimeSeconds,
   selectedCharacter,
   craftedWords = [],
+  isImportedRun = false,
   onPlayAgain,
   onTitleScreen,
 }) => {
@@ -98,6 +100,8 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
       characterId: selectedCharacter,
       roomsCleared: 3,
       craftedWords: displayWords,
+      isImported: isImportedRun,
+      verified: !isImportedRun,
     });
 
     sounds.playKanaObtained();
@@ -186,6 +190,19 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
               </span>
             </div>
 
+            {/* Imported / Unverified Run Notice */}
+            {isImportedRun && (
+              <div className="bg-amber-950/80 border-2 border-amber-500/80 p-2 sm:p-2.5 w-full flex flex-col items-center gap-1 text-center shadow">
+                <div className="flex items-center gap-1.5 text-amber-300 font-pixel text-[10px] sm:text-xs">
+                  <span>⚠️</span>
+                  <span>RESTORED BACKUP — UNVERIFIED RUN</span>
+                </div>
+                <p className="text-[10px] text-amber-200/90 font-sans leading-tight max-w-sm">
+                  This game was restored from a backup file. To protect competitive speedrun integrity, this run is saved locally as Unverified and excluded from global speedrun rankings.
+                </p>
+              </div>
+            )}
+
             {/* Final Statistics */}
             <div className="bg-slate-900/90 border-2 border-slate-700 p-2.5 w-full grid grid-cols-3 gap-2 text-center">
               <div>
@@ -267,9 +284,9 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
                 className="bg-slate-950 border-2 border-amber-500/80 p-2.5 sm:p-3 w-full flex flex-col items-center gap-2 shadow-lg"
               >
                 <div className="flex items-center gap-2 text-amber-400 font-pixel text-xs">
-                  <span>🏆</span>
-                  <span>NAME THIS RUN FOR THE LEADERBOARD</span>
-                  <span>🏆</span>
+                  <span>{isImportedRun ? '⚠️' : '🏆'}</span>
+                  <span>{isImportedRun ? 'SAVE AS UNVERIFIED LOCAL RUN' : 'NAME THIS RUN FOR THE LEADERBOARD'}</span>
+                  <span>{isImportedRun ? '⚠️' : '🏆'}</span>
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-2 w-full max-w-sm mt-0.5">
@@ -286,14 +303,14 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
                     type="submit"
                     className="px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-black font-pixel text-xs font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-md whitespace-nowrap"
                   >
-                    RECORD RUN ➔
+                    {isImportedRun ? 'RECORD LOCAL ➔' : 'RECORD RUN ➔'}
                   </button>
                 </div>
               </form>
             ) : (
               <div className="bg-emerald-950/60 border-2 border-emerald-400 p-2.5 w-full flex flex-col items-center gap-1.5 shadow">
                 <span className="font-pixel text-xs text-emerald-300">
-                  ✓ RUN RECORDED AS &quot;{runName}&quot;
+                  ✓ RUN RECORDED AS &quot;{runName}&quot; {isImportedRun ? '(UNVERIFIED)' : ''}
                 </span>
                 {ranks && (
                   <div className="flex gap-2 text-[10px] font-pixel">
