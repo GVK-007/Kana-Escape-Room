@@ -5,6 +5,7 @@ import { getCharacterSprite } from '../../utils/pixelArt';
 import { sounds } from '../../utils/audio';
 import { LeaderboardModal } from './LeaderboardModal';
 import { SaveTransferModal } from './SaveTransferModal';
+import { HowToPlayModal } from './HowToPlayModal';
 
 interface TitleScreenProps {
   hasSaveData: boolean;
@@ -33,6 +34,7 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   const [showConfirmNewGame, setShowConfirmNewGame] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showSaveTransfer, setShowSaveTransfer] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [animFrame, setAnimFrame] = useState(0);
 
   // Animate character preview idle
@@ -124,6 +126,17 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
               CONTINUE GAME
             </button>
           )}
+
+          <button
+            onClick={() => {
+              sounds.playSelect();
+              setShowHowToPlay(true);
+            }}
+            className="py-2.5 bg-cyan-950/90 hover:bg-cyan-900 text-cyan-300 font-pixel text-xs border-2 border-cyan-400/80 cursor-pointer active:translate-y-0.5 shadow-md flex items-center justify-center gap-2"
+          >
+            <span>📜</span>
+            <span>HOW TO PLAY</span>
+          </button>
 
           <button
             onClick={() => {
@@ -237,6 +250,9 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
           </div>
         </div>
       )}
+
+      {/* How To Play Modal */}
+      {showHowToPlay && <HowToPlayModal onClose={() => setShowHowToPlay(false)} />}
 
       {/* Leaderboard Modal */}
       {showLeaderboard && <LeaderboardModal onClose={() => setShowLeaderboard(false)} />}
