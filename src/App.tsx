@@ -347,30 +347,6 @@ export default function App() {
     sounds.playFail();
   };
 
-  // Import save data handler
-  const handleSaveImported = (data: GameSaveState) => {
-    const rIndex = ROOMS.findIndex((r) => r.id === data.currentRoomId);
-    const targetIdx = rIndex !== -1 ? rIndex : 0;
-    setCurrentRoomIndex(targetIdx);
-    setSelectedCharacter(data.selectedCharacter || 'adam');
-    setInventory(data.inventory || []);
-    setCompletedMinigames(data.completedMinigames || []);
-    setCraftedWords(data.craftedWords || []);
-    setUnlockedDoors(data.unlockedDoors || []);
-    setDisplayedItems(data.displayedItems || {});
-    setSpawnDirection('forward');
-    setPlaytimeSeconds(data.playtimeSeconds || 0);
-    setVolumeEnabled(data.volumeEnabled ?? true);
-    sounds.setEnabled(data.volumeEnabled ?? true);
-    setIsImportedRun(true);
-    if (data.shuffledRewards && Object.keys(data.shuffledRewards).length > 0) {
-      setShuffledRewards(data.shuffledRewards);
-    } else {
-      setShuffledRewards(generateShuffledRoomRewards(ROOMS));
-    }
-    setHasSaveData(true);
-  };
-
   const currentRoom: RoomData = useMemo(() => {
     const baseRoom = ROOMS[currentRoomIndex] || ROOMS[0];
     return applyShuffledRewards(baseRoom, shuffledRewards);
@@ -547,7 +523,6 @@ export default function App() {
           onStartNewGame={handleStartNewGame}
           onContinueGame={handleContinueGame}
           onResetSave={handleResetSave}
-          onSaveImported={handleSaveImported}
           volumeEnabled={volumeEnabled}
           onToggleVolume={toggleVolume}
         />
@@ -684,7 +659,6 @@ export default function App() {
           onResume={() => setGameState('PLAYING')}
           onOpenInventory={() => setGameState('INVENTORY')}
           onQuitToTitle={() => setGameState('TITLE')}
-          onSaveImported={handleSaveImported}
           isImportedRun={isImportedRun}
         />
       )}

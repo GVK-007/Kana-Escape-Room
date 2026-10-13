@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { CharacterId, GameSaveState } from '../../types/game';
+import { CharacterId } from '../../types/game';
 import { CHARACTERS } from '../../data/characters';
 import { getCharacterSprite } from '../../utils/pixelArt';
 import { sounds } from '../../utils/audio';
 import { LeaderboardModal } from './LeaderboardModal';
-import { SaveTransferModal } from './SaveTransferModal';
 import { HowToPlayModal } from './HowToPlayModal';
 
 interface TitleScreenProps {
@@ -14,7 +13,6 @@ interface TitleScreenProps {
   onStartNewGame: () => void;
   onContinueGame: () => void;
   onResetSave: () => void;
-  onSaveImported?: (data: GameSaveState) => void;
   volumeEnabled: boolean;
   onToggleVolume: () => void;
 }
@@ -26,14 +24,12 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
   onStartNewGame,
   onContinueGame,
   onResetSave,
-  onSaveImported,
   volumeEnabled,
   onToggleVolume,
 }) => {
   const [showConfirmReset, setShowConfirmReset] = useState(false);
   const [showConfirmNewGame, setShowConfirmNewGame] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showSaveTransfer, setShowSaveTransfer] = useState(false);
   const [showHowToPlay, setShowHowToPlay] = useState(false);
   const [animFrame, setAnimFrame] = useState(0);
 
@@ -163,17 +159,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
             <span>HALL OF FAME</span>
           </button>
 
-          <button
-            onClick={() => {
-              sounds.playSelect();
-              setShowSaveTransfer(true);
-            }}
-            className="py-2 bg-slate-900 hover:bg-slate-800 text-cyan-300 font-pixel text-[10px] border border-cyan-700/80 cursor-pointer active:translate-y-0.5 flex items-center justify-center gap-1.5 shadow-sm"
-          >
-            <span>💾</span>
-            <span>BACKUP & RESTORE SAVE</span>
-          </button>
-
           {hasSaveData && (
             <button
               onClick={() => {
@@ -256,16 +241,6 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
       {/* Leaderboard Modal */}
       {showLeaderboard && <LeaderboardModal onClose={() => setShowLeaderboard(false)} />}
-
-      {/* Save Backup & Restore Modal */}
-      {showSaveTransfer && (
-        <SaveTransferModal
-          onClose={() => setShowSaveTransfer(false)}
-          onSaveImported={(data) => {
-            if (onSaveImported) onSaveImported(data);
-          }}
-        />
-      )}
     </div>
   );
 };
