@@ -1,27 +1,32 @@
 import React, { useState, useEffect, useCallback, Suspense } from 'react';
-import { InteractableObject } from '../../types/game';
+import { InteractableObject, MinigameType } from '../../types/game';
 import { sounds } from '../../utils/audio';
 
-import { Game2048 } from './Game2048';
-import { GameSnake } from './GameSnake';
-import { GameFlappy } from './GameFlappy';
-import { GameColorMatch } from './GameColorMatch';
-import { GameTimedCode } from './GameTimedCode';
-import { GamePatternMemory } from './GamePatternMemory';
-import { GameKanaCatcher } from './GameKanaCatcher';
-import { GameWallBreaker } from './GameWallBreaker';
-import { GameTicTacToe } from './GameTicTacToe';
-import { GamePong } from './GamePong';
-import { GameMatch3 } from './GameMatch3';
-import { GameNutsAndBolts } from './GameNutsAndBolts';
-import { GameSlidingPuzzle } from './GameSlidingPuzzle';
-import { GameLaneRunner } from './GameLaneRunner';
-import { GameRockPaperScissors } from './GameRockPaperScissors';
-import { GameSeaBattle } from './GameSeaBattle';
-import { GameDarts } from './GameDarts';
-import { GameAngryBirds } from './GameAngryBirds';
-import { GameDotsAndBoxes } from './GameDotsAndBoxes';
-import { GameCardMatch } from './GameCardMatch';
+const MINIGAME_REGISTRY: Record<
+  MinigameType,
+  React.LazyExoticComponent<React.ComponentType<{ onSuccess: () => void }>>
+> = {
+  '2048': React.lazy(() => import('./Game2048').then((m) => ({ default: m.Game2048 }))),
+  'snake': React.lazy(() => import('./GameSnake').then((m) => ({ default: m.GameSnake }))),
+  'flappy': React.lazy(() => import('./GameFlappy').then((m) => ({ default: m.GameFlappy }))),
+  'color_match': React.lazy(() => import('./GameColorMatch').then((m) => ({ default: m.GameColorMatch }))),
+  'timed_code': React.lazy(() => import('./GameTimedCode').then((m) => ({ default: m.GameTimedCode }))),
+  'pattern_memory': React.lazy(() => import('./GamePatternMemory').then((m) => ({ default: m.GamePatternMemory }))),
+  'kana_catcher': React.lazy(() => import('./GameKanaCatcher').then((m) => ({ default: m.GameKanaCatcher }))),
+  'wall_breaker': React.lazy(() => import('./GameWallBreaker').then((m) => ({ default: m.GameWallBreaker }))),
+  'tic_tac_toe': React.lazy(() => import('./GameTicTacToe').then((m) => ({ default: m.GameTicTacToe }))),
+  'pong': React.lazy(() => import('./GamePong').then((m) => ({ default: m.GamePong }))),
+  'match3': React.lazy(() => import('./GameMatch3').then((m) => ({ default: m.GameMatch3 }))),
+  'nuts_and_bolts': React.lazy(() => import('./GameNutsAndBolts').then((m) => ({ default: m.GameNutsAndBolts }))),
+  'sliding_puzzle': React.lazy(() => import('./GameSlidingPuzzle').then((m) => ({ default: m.GameSlidingPuzzle }))),
+  'lane_runner': React.lazy(() => import('./GameLaneRunner').then((m) => ({ default: m.GameLaneRunner }))),
+  'rock_paper_scissors': React.lazy(() => import('./GameRockPaperScissors').then((m) => ({ default: m.GameRockPaperScissors }))),
+  'sea_battle': React.lazy(() => import('./GameSeaBattle').then((m) => ({ default: m.GameSeaBattle }))),
+  'darts': React.lazy(() => import('./GameDarts').then((m) => ({ default: m.GameDarts }))),
+  'angry_birds': React.lazy(() => import('./GameAngryBirds').then((m) => ({ default: m.GameAngryBirds }))),
+  'dots_and_boxes': React.lazy(() => import('./GameDotsAndBoxes').then((m) => ({ default: m.GameDotsAndBoxes }))),
+  'card_match': React.lazy(() => import('./GameCardMatch').then((m) => ({ default: m.GameCardMatch }))),
+};
 
 interface MiniGameModalProps {
   interactable: InteractableObject;
@@ -44,12 +49,17 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
   });
 
   useEffect(() => {
+    let rAF = 0;
     const onResize = () => {
-      setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      cancelAnimationFrame(rAF);
+      rAF = requestAnimationFrame(() => {
+        setWindowSize({ width: window.innerWidth, height: window.innerHeight });
+      });
     };
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onResize);
     return () => {
+      cancelAnimationFrame(rAF);
       window.removeEventListener('resize', onResize);
       window.removeEventListener('orientationchange', onResize);
     };
@@ -84,50 +94,20 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
   }, [onClose, handleReset]);
 
   const renderGame = () => {
-    switch (interactable.minigameType) {
-      case '2048':
-        return <Game2048 onSuccess={onSuccess} />;
-      case 'snake':
-        return <GameSnake onSuccess={onSuccess} />;
-      case 'flappy':
-        return <GameFlappy onSuccess={onSuccess} />;
-      case 'color_match':
-        return <GameColorMatch onSuccess={onSuccess} />;
-      case 'timed_code':
-        return <GameTimedCode onSuccess={onSuccess} />;
-      case 'pattern_memory':
-        return <GamePatternMemory onSuccess={onSuccess} />;
-      case 'kana_catcher':
-        return <GameKanaCatcher onSuccess={onSuccess} />;
-      case 'wall_breaker':
-        return <GameWallBreaker onSuccess={onSuccess} />;
-      case 'tic_tac_toe':
-        return <GameTicTacToe onSuccess={onSuccess} />;
-      case 'pong':
-        return <GamePong onSuccess={onSuccess} />;
-      case 'match3':
-        return <GameMatch3 onSuccess={onSuccess} />;
-      case 'nuts_and_bolts':
-        return <GameNutsAndBolts onSuccess={onSuccess} />;
-      case 'sliding_puzzle':
-        return <GameSlidingPuzzle onSuccess={onSuccess} />;
-      case 'lane_runner':
-        return <GameLaneRunner onSuccess={onSuccess} />;
-      case 'rock_paper_scissors':
-        return <GameRockPaperScissors onSuccess={onSuccess} />;
-      case 'sea_battle':
-        return <GameSeaBattle onSuccess={onSuccess} />;
-      case 'darts':
-        return <GameDarts onSuccess={onSuccess} />;
-      case 'angry_birds':
-        return <GameAngryBirds onSuccess={onSuccess} />;
-      case 'dots_and_boxes':
-        return <GameDotsAndBoxes onSuccess={onSuccess} />;
-      case 'card_match':
-        return <GameCardMatch onSuccess={onSuccess} />;
-      default:
-        return <div className="text-white">Unknown Game</div>;
-    }
+    const LazyComponent = MINIGAME_REGISTRY[interactable.minigameType];
+    return LazyComponent ? (
+      <Suspense
+        fallback={
+          <div className="flex flex-col items-center justify-center p-8 text-yellow-300 font-pixel text-xs animate-pulse">
+            LOADING PUZZLE TRIAL...
+          </div>
+        }
+      >
+        <LazyComponent onSuccess={onSuccess} />
+      </Suspense>
+    ) : (
+      <div className="text-white">Unknown Game</div>
+    );
   };
 
   const isLandscape = windowSize.width > windowSize.height;

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 
 interface VirtualJoystickProps {
   onMove: (vector: { x: number; y: number }) => void;
@@ -16,6 +16,21 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
   const centerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const [knobPos, setKnobPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    const handleReset = () => {
+      activePointerIdRef.current = null;
+      setIsActive(false);
+      setKnobPos({ x: 0, y: 0 });
+      onRelease();
+    };
+    window.addEventListener('blur', handleReset);
+    document.addEventListener('visibilitychange', handleReset);
+    return () => {
+      window.removeEventListener('blur', handleReset);
+      document.removeEventListener('visibilitychange', handleReset);
+    };
+  }, [onRelease]);
 
   const MAX_RADIUS = 36; // Maximum thumb travel radius in px
   const DEADZONE = 5; // Minimum deadzone radius in px
@@ -88,6 +103,7 @@ export const VirtualJoystick: React.FC<VirtualJoystickProps> = ({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
+      onLostPointerCapture={handlePointerUp}
       className={`relative w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] rounded-full bg-slate-950/95 border-4 ${
         isActive ? 'border-yellow-400 shadow-[0_0_16px_rgba(250,204,21,0.45)]' : 'border-slate-700 shadow-2xl'
       } flex items-center justify-center select-none touch-none cursor-pointer transition-colors`}

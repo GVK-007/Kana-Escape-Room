@@ -220,13 +220,13 @@ export function validateAndSanitizeSave(
     playtimeSeconds = Math.max(playtimeSeconds, minPlausibleSeconds);
   }
 
-  // 9. Displayed items
+  // 9. Displayed items (preserve fixed slot positions 0 and 1)
   const validDisplayedItems: Record<string, string[]> = {};
   if (raw.displayedItems && typeof raw.displayedItems === 'object') {
     for (const [tableId, items] of Object.entries(raw.displayedItems)) {
       if (typeof tableId === 'string' && Array.isArray(items)) {
-        validDisplayedItems[tableId] = items.filter(
-          (w) => typeof w === 'string' && (JAPANESE_DICTIONARY[w] || validCraftedWords.includes(w))
+        validDisplayedItems[tableId] = items.map(
+          (w) => (typeof w === 'string' && (JAPANESE_DICTIONARY[w] || validCraftedWords.includes(w))) ? w : ''
         );
       }
     }

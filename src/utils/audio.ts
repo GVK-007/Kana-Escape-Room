@@ -73,6 +73,18 @@ class SoundEngine {
     return this.enabled;
   }
 
+  public suspend() {
+    if (this.ctx && this.ctx.state === 'running') {
+      this.ctx.suspend().catch(() => {});
+    }
+  }
+
+  public resume() {
+    if (this.ctx && this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+  }
+
   public setAmbientEnabled(val: boolean) {
     this.ambientEnabled = val;
     this.initCtx();

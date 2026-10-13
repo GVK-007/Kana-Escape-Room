@@ -193,13 +193,13 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
     }
     tapTargetRef.current = null;
     tapRippleRef.current = null;
-    const isPortrait = device.orientation === 'portrait';
+    const isPortrait = device.layoutMode === 'portrait';
     const initScale = isPortrait
       ? (room.id === 'room-3' || room.number === 3 ? 2.10 : (room.id === 'room-2' || room.number === 2 ? 2.35 : 2.85))
       : (device.scale || DEFAULT_SCALE);
     camOffsetRef.current.scale = initScale;
     atmosphereRef.current.init(room.id, room.width, room.height, TILE_SIZE);
-  }, [room, spawnDirection, device.orientation, device.scale]);
+  }, [room, spawnDirection, device.layoutMode, device.scale]);
 
   // When locked (minigame or modal active), clear keys and stop movement
   useEffect(() => {
@@ -241,13 +241,13 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
       } else if (e.code === 'KeyI') {
         e.preventDefault();
         onOpenInventory();
-      } else if (e.code === 'F1') {
+      } else if (import.meta.env.DEV && e.code === 'F1') {
         e.preventDefault();
         setDebugMode((d) => !d);
-      } else if (e.code === 'F3' && onDebugGiveKana) {
+      } else if (import.meta.env.DEV && e.code === 'F3' && onDebugGiveKana) {
         e.preventDefault();
         onDebugGiveKana();
-      } else if (e.code === 'F4' && onDebugUnlockDoor) {
+      } else if (import.meta.env.DEV && e.code === 'F4' && onDebugUnlockDoor) {
         e.preventDefault();
         onDebugUnlockDoor();
       }
@@ -261,11 +261,21 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
       keysRef.current[e.code] = false;
     };
 
+    const handleResetInputs = () => {
+      keysRef.current = {};
+      joystickVectorRef.current = { x: 0, y: 0 };
+      activeDpadPointerRef.current = null;
+    };
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleResetInputs);
+    document.addEventListener('visibilitychange', handleResetInputs);
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleResetInputs);
+      document.removeEventListener('visibilitychange', handleResetInputs);
     };
   }, [isLocked, isNearDoor, isNearEntrance, nearbyInteractable, onInteract, onInteractDoor, onReturnToPrevRoom, onOpenInventory, onOpenPauseMenu, onDebugGiveKana, onDebugUnlockDoor]);
 
@@ -703,6 +713,12 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
     };
 
     const gameLoop = (currentTime?: number) => {
+      if (document.hidden) {
+        lastTime = performance.now();
+        animId = requestAnimationFrame(gameLoop);
+        return;
+      }
+
       const now = currentTime || performance.now();
       let deltaMs = now - lastTime;
       lastTime = now;
@@ -726,7 +742,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
 
       ctx.save();
       // Center camera on player with room-specific scale (Room 1: 2.85; Room 2: 2.35; Room 3: 2.10)
-      const isPortrait = device.orientation === 'portrait';
+      const isPortrait = device.layoutMode === 'portrait';
       let currentScale = device.scale || DEFAULT_SCALE;
       if (isPortrait) {
         if (room.id === 'room-3' || room.number === 3) {
@@ -993,7 +1009,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
     displayedItems,
   ]);
 
-  const isPortraitEmulator = device.orientation === 'portrait';
+  const isPortraitEmulator = device.layoutMode === 'portrait';
 
   return (
     <div className={`w-full flex flex-col items-center select-none ${isPortraitEmulator ? 'h-full flex-1 justify-between min-h-0' : 'h-full justify-center my-auto'}`}>
@@ -1061,8 +1077,8 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
           </div>
         )}
 
-        {/* Landscape floating controls for mobile landscape only */}
-        {!isPortraitEmulator && !isLocked && (showTouchControls || device.isMobile) && (
+        {/* Landscape floating controls for mobile/touch landscape */}
+        {!isPortraitEmulator && !isLocked && (showTouchControls || device.isMobile || device.isTouch) && (
           <>
             <div className="absolute bottom-3 left-3 z-30 opacity-80 hover:opacity-100 transition-opacity pointer-events-auto">
               {controlType === 'joystick' ? (
@@ -1125,7 +1141,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
         )}
 
         {/* Desktop Controls Bar at bottom of screen - Hidden on touch/mobile to prevent overlapping buttons */}
-        {!isPortraitEmulator && !isLocked && !device.isMobile && !showTouchControls && (
+        {!isPortraitEmulator && !isLocked && !device.isMobile && !device.isTouch && !showTouchControls && (
           <div className="absolute bottom-1 left-2 right-2 flex justify-between items-center text-[9px] sm:text-[10px] font-pixel text-slate-400 bg-black/85 backdrop-blur-xs px-2 sm:px-3 py-1 border border-slate-700/60 z-20 gap-2">
             <span className="hidden sm:inline">WASD/Arrows = Move • [E] = Interact • [I] = Bag</span>
             <span className="sm:hidden text-amber-300/80">Kana Escape</span>
@@ -1148,7 +1164,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
         )}
 
         {/* Debug Keys Indicator */}
-        {debugMode && (
+        {import.meta.env.DEV && debugMode && (
           <div className="absolute top-2 left-2 bg-red-950/90 border border-red-500 text-red-200 text-[9px] font-mono p-2 z-40">
             <div>[DEBUG MODE ACTIVE]</div>
             <div>F1: Toggle Collision Boxes</div>
@@ -1197,6 +1213,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
                   onPointerMove={handleDpadPointerMove}
                   onPointerUp={handleDpadPointerUp}
                   onPointerCancel={handleDpadPointerUp}
+                  onLostPointerCapture={handleDpadPointerUp}
                   className="relative w-[110px] h-[110px] sm:w-[124px] sm:h-[124px] rounded-full bg-slate-950/95 border-4 border-slate-700 shadow-2xl flex items-center justify-center select-none touch-none cursor-pointer"
                   style={{ touchAction: 'none' }}
                 >

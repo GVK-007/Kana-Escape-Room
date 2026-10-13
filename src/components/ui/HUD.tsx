@@ -7,6 +7,7 @@ interface HUDProps {
   currentRoom: RoomData;
   inventory: KanaItem[];
   isDoorUnlocked: boolean;
+  isOnline?: boolean;
   onOpenInventory: () => void;
   onOpenPauseMenu: () => void;
   onOpenDoorClue?: () => void;
@@ -17,6 +18,7 @@ export const HUD: React.FC<HUDProps> = ({
   currentRoom,
   inventory,
   isDoorUnlocked,
+  isOnline = true,
   onOpenInventory,
   onOpenPauseMenu,
   onOpenDoorClue,
@@ -82,6 +84,16 @@ export const HUD: React.FC<HUDProps> = ({
 
       {/* Buttons */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {!isOnline && (
+          <div
+            title="Running in Offline Mode (cached assets active)"
+            className="flex items-center gap-1 bg-amber-950/90 border border-amber-600/80 px-1.5 py-1 text-amber-300 text-[8px] sm:text-[9px] font-pixel shrink-0 shadow-sm"
+          >
+            <span>⚡</span>
+            <span className="hidden sm:inline">OFFLINE</span>
+          </div>
+        )}
+
         <button
           onClick={() => {
             sounds.playSelect();

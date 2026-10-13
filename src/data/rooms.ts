@@ -462,3 +462,53 @@ export function applyShuffledRewards(
     })),
   };
 }
+
+/**
+ * Verifies that a room's reward pool can solve its exit door.
+ * Throws an Error in development/test if any required Kana is missing.
+ */
+export function validateRoomSolvability(room: RoomData): boolean {
+  const poolCharacters = room.interactables.map((i) => i.rewardKana.character);
+  for (const req of room.requiredKana) {
+    if (!poolCharacters.includes(req)) {
+      throw new Error(
+        `[Solvability Assertion Failure] Room "${room.id}" requires kana '${req}' for word "${room.targetWord}", but it is missing from the room reward pool!`
+      );
+    }
+  }
+
+  const available: Record<string, number> = {};
+  for (const c of poolCharacters) {
+    available[c] = (available[c] || 0) + 1;
+  }
+  for (const char of room.targetWord) {
+    if (!available[char] || available[char] <= 0) {
+      throw new Error(
+        `[Solvability Assertion Failure] Room "${room.id}" target word "${room.targetWord}" requires character '${char}', which is exhausted or missing in the reward pool!`
+      );
+    }
+    available[char]--;
+  }
+
+  return true;
+}
+
+/**
+ * Validates all rooms in the game against their door requirements.
+ */
+export function validateAllRoomsSolvability(rooms: RoomData[] = ROOMS): boolean {
+  for (const room of rooms) {
+    validateRoomSolvability(room);
+  }
+  return true;
+}
+
+// Development assertion check
+if (import.meta.env?.DEV) {
+  try {
+    validateAllRoomsSolvability(ROOMS);
+  } catch (err) {
+    console.error(err);
+  }
+}
+

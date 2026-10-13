@@ -10,7 +10,8 @@ export interface DeviceModeInfo {
   isTablet: boolean;
   isDesktop: boolean;
   isTouch: boolean;
-  orientation: 'portrait' | 'landscape';
+  orientation: 'portrait' | 'landscape'; // Physical screen orientation
+  layoutMode: 'portrait' | 'landscape';  // Effective layout mode based on preference & orientation
   aspectRatio: AspectRatioMode;
   canvasWidth: number;
   canvasHeight: number;
@@ -37,24 +38,44 @@ export function useDeviceMode(): DeviceModeInfo {
     return 'auto';
   });
 
-  const [windowSize, setWindowSize] = useState({
-    width: typeof window !== 'undefined' ? window.innerWidth : 1280,
-    height: typeof window !== 'undefined' ? window.innerHeight : 720,
-  });
+  const [windowSize, setWindowSize] = useState(() => ({
+    width: typeof window !== 'undefined' ? (window.visualViewport ? Math.round(window.visualViewport.width) : window.innerWidth) : 1280,
+    height: typeof window !== 'undefined' ? (window.visualViewport ? Math.round(window.visualViewport.height) : window.innerHeight) : 720,
+  }));
 
+  // Debounced viewport observer using requestAnimationFrame, ignoring minor mobile address bar changes (< 80px)
   useEffect(() => {
+    let rAF = 0;
     const handleResize = () => {
-      setWindowSize({
-        width: window.innerWidth,
-        height: window.innerHeight,
+      cancelAnimationFrame(rAF);
+      rAF = requestAnimationFrame(() => {
+        const vp = window.visualViewport;
+        const newWidth = vp ? Math.round(vp.width) : window.innerWidth;
+        const newHeight = vp ? Math.round(vp.height) : window.innerHeight;
+
+        setWindowSize((prev) => {
+          const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+          // Ignore insignificant browser address bar height changes on touch screens
+          if (isTouchDevice && prev.width === newWidth && Math.abs(prev.height - newHeight) < 80) {
+            return prev;
+          }
+          return { width: newWidth, height: newHeight };
+        });
       });
     };
 
     window.addEventListener('resize', handleResize);
     window.addEventListener('orientationchange', handleResize);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleResize);
+    }
     return () => {
+      cancelAnimationFrame(rAF);
       window.removeEventListener('resize', handleResize);
       window.removeEventListener('orientationchange', handleResize);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleResize);
+      }
     };
   }, []);
 
@@ -89,14 +110,6 @@ export function useDeviceMode(): DeviceModeInfo {
   const coarsePointer = typeof window !== 'undefined' && (window.matchMedia?.('(pointer: coarse)').matches ?? false);
   const isPortrait = height > width;
 
-  const toggleAspectRatio = useCallback(() => {
-    if (isPortrait) {
-      setPortraitRatio((prev) => (prev === '1:1' ? '3:2' : '1:1'));
-    } else {
-      setLandscapeRatio((prev) => (prev === '16:9' ? '3:2' : '16:9'));
-    }
-  }, [isPortrait]);
-
   // Auto detection
   const detectedIsMobile = width < 768 || (isTouch && width < 900 && coarsePointer);
   const detectedIsTablet = !detectedIsMobile && (width < 1024 || (isTouch && coarsePointer));
@@ -119,13 +132,30 @@ export function useDeviceMode(): DeviceModeInfo {
     isTablet = false;
   }
 
+  // Determine effective layout mode based on preference:
+  // - If preference is 'pc', force landscape layout regardless of viewport orientation
+  // - If preference is 'mobile', force portrait layout
+  // - If 'auto', follow physical orientation
+  const layoutMode: 'portrait' | 'landscape' =
+    preference === 'pc' ? 'landscape' :
+    preference === 'mobile' ? 'portrait' :
+    isPortrait ? 'portrait' : 'landscape';
+
+  const toggleAspectRatio = useCallback(() => {
+    if (layoutMode === 'portrait') {
+      setPortraitRatio((prev) => (prev === '1:1' ? '3:2' : '1:1'));
+    } else {
+      setLandscapeRatio((prev) => (prev === '16:9' ? '3:2' : '16:9'));
+    }
+  }, [layoutMode]);
+
   // Determine Aspect Ratio and Canvas Resolution
   let aspectRatio: AspectRatioMode = '16:9';
   let canvasWidth = 960;
   let canvasHeight = 540;
   let baseScale = 2.65;
 
-  if (isPortrait || (isMobile && !isDesktop && isPortrait)) {
+  if (layoutMode === 'portrait') {
     if (portraitRatio === '1:1') {
       aspectRatio = '1:1';
       canvasWidth = 360;
@@ -170,6 +200,7 @@ export function useDeviceMode(): DeviceModeInfo {
     isDesktop,
     isTouch: Boolean(isTouch),
     orientation: isPortrait ? 'portrait' : 'landscape',
+    layoutMode,
     aspectRatio,
     canvasWidth,
     canvasHeight,

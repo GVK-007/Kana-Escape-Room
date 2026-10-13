@@ -9,7 +9,6 @@ import {
   fetchLeaderboardAsync,
   deleteLeaderboardRunAsync,
   resetGlobalLeaderboardAsync,
-  DEFAULT_ADMIN_KEY,
   getLastPlayerRunId,
   getMyRunIds,
 } from '../../utils/leaderboard';
@@ -93,16 +92,11 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     if (e) e.preventDefault();
     const key = adminInput.trim();
     if (!key) return;
-    if (key === DEFAULT_ADMIN_KEY) {
-      sessionStorage.setItem('kana_leaderboard_admin_key', key);
-      setAdminKey(key);
-      setShowAdminModal(false);
-      setAdminError('');
-      sounds.playKanaObtained();
-    } else {
-      setAdminError('Incorrect Admin Passcode');
-      sounds.playFail();
-    }
+    sessionStorage.setItem('kana_leaderboard_admin_key', key);
+    setAdminKey(key);
+    setShowAdminModal(false);
+    setAdminError('');
+    sounds.playKanaObtained();
   };
 
   const handleLockAdmin = () => {
@@ -121,6 +115,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         if (onRefresh) onRefresh(res.allEntries);
       } else {
         alert(res.error || 'Failed to delete run');
+        if (res.error?.includes('Admin Key')) {
+          handleLockAdmin();
+        }
       }
     } finally {
       setActionLoading(false);
@@ -139,6 +136,9 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         setShowResetConfirm(false);
       } else {
         alert(res.error || 'Failed to reset leaderboard');
+        if (res.error?.includes('Admin Key')) {
+          handleLockAdmin();
+        }
       }
     } finally {
       setActionLoading(false);

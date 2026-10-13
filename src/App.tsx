@@ -107,6 +107,22 @@ export default function App() {
     }
   });
 
+  // Online status detection
+  const [isOnline, setIsOnline] = useState<boolean>(() =>
+    typeof navigator !== 'undefined' ? navigator.onLine : true
+  );
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   // Check saved state on mount
   useEffect(() => {
     try {
@@ -170,7 +186,7 @@ export default function App() {
     }
   }, [gameState, inventory, completedMinigames, unlockedDoors, shuffledRewards, roomHints, displayedItems, saveGame]);
 
-  // Playtime tick
+  // Playtime tick - pauses when document is backgrounded/hidden
   useEffect(() => {
     if (
       gameState === 'TITLE' ||
@@ -181,10 +197,37 @@ export default function App() {
     )
       return;
     const timer = setInterval(() => {
+      if (document.hidden) return;
       setPlaytimeSeconds((s) => s + 1);
     }, 1000);
     return () => clearInterval(timer);
   }, [gameState]);
+
+  // Tab visibility management: suspend Web Audio and ambient when hidden; resume when visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sounds.suspend();
+        sounds.stopAmbient();
+      } else {
+        sounds.resume();
+        if (
+          gameState === 'PLAYING' ||
+          gameState === 'INVENTORY' ||
+          gameState === 'DOOR_CLUE' ||
+          gameState === 'MINIGAME'
+        ) {
+          const room = ROOMS[currentRoomIndex];
+          if (room) {
+            sounds.startRoomAmbient(room.id);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [gameState, currentRoomIndex]);
 
   // Global Escape key coordinator:
   // - In MINIGAME: exits minigame back to PLAYING (never opens pause menu)
@@ -436,7 +479,7 @@ export default function App() {
   const handlePlaceTableItem = (word: string, slotIndex: number) => {
     if (!activeTableId) return;
     setDisplayedItems((prev) => {
-      const existing = prev[activeTableId] ? [...prev[activeTableId]] : [];
+      const existing = prev[activeTableId] ? [...prev[activeTableId]] : ['', ''];
       existing[slotIndex] = word;
       return { ...prev, [activeTableId]: existing };
     });
@@ -445,9 +488,9 @@ export default function App() {
   const handleRemoveTableItem = (slotIndex: number) => {
     if (!activeTableId) return;
     setDisplayedItems((prev) => {
-      const existing = prev[activeTableId] ? [...prev[activeTableId]] : [];
+      const existing = prev[activeTableId] ? [...prev[activeTableId]] : ['', ''];
       existing[slotIndex] = '';
-      return { ...prev, [activeTableId]: existing.filter(Boolean) };
+      return { ...prev, [activeTableId]: existing };
     });
   };
 
@@ -492,7 +535,7 @@ export default function App() {
     sounds.playKanaObtained();
   };
 
-  const isPortraitEmulator = device.orientation === 'portrait';
+  const isPortraitEmulator = device.layoutMode === 'portrait';
 
   return (
     <main className={`w-screen ${isPortraitEmulator ? 'h-[100dvh]' : 'h-screen'} bg-[#0e0d1a] flex flex-col items-center justify-center relative overflow-hidden select-none`}>
@@ -523,6 +566,7 @@ export default function App() {
             currentRoom={currentRoom}
             inventory={inventory}
             isDoorUnlocked={isDoorUnlocked}
+            isOnline={isOnline}
             onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
             onOpenInventory={handleOpenInventory}
             onOpenPauseMenu={handleOpenPauseMenu}
