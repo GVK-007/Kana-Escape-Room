@@ -10,6 +10,9 @@ import {
   sortLeaderboard,
   LeaderboardEntry,
   formatTime,
+  getPlayerTag,
+  generatePlayerTag,
+  getSavedPlayerName,
 } from '../../utils/leaderboard';
 import { LeaderboardView } from './LeaderboardView';
 
@@ -36,7 +39,10 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
     getLeaderboard()
   );
   const defaultSuggestedName = `Run #${leaderboardEntries.length + 1}`;
-  const [runName, setRunName] = useState(defaultSuggestedName);
+  const [playerName, setPlayerName] = useState(() => getSavedPlayerName() || '');
+  const [playerTag, setPlayerTagState] = useState(() => getPlayerTag());
+  const [submittedRunName, setSubmittedRunName] = useState('');
+  const [submittedTag, setSubmittedTag] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [ranks, setRanks] = useState<{ time: number; artifacts: number } | null>(null);
   const [highlightId, setHighlightId] = useState<string | undefined>(undefined);
@@ -91,10 +97,14 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
     if (e) e.preventDefault();
     if (submitted) return;
 
-    const chosenName = runName.trim() || defaultSuggestedName;
+    const chosenName = playerName.trim() || defaultSuggestedName;
+    const cleanTag = playerTag.trim().startsWith('#')
+      ? playerTag.trim().slice(0, 7)
+      : `#${playerTag.trim().slice(0, 6) || '1000'}`;
 
     const res = saveLeaderboardEntry({
-      runName: chosenName,
+      playerName: chosenName,
+      playerTag: cleanTag,
       playtimeSeconds,
       totalKana,
       characterId: selectedCharacter,
@@ -105,6 +115,8 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
     });
 
     sounds.playKanaObtained();
+    setSubmittedRunName(chosenName);
+    setSubmittedTag(cleanTag);
     setSubmitted(true);
     setRanks({ time: res.timeRank, artifacts: res.artifactsRank });
     setHighlightId(res.entry.id);
@@ -277,7 +289,7 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
               </div>
             </div>
 
-            {/* Run Name Submission Card */}
+            {/* Run Name & # Identification Tag Submission Card */}
             {!submitted ? (
               <form
                 onSubmit={handleSubmitRun}
@@ -285,33 +297,84 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
               >
                 <div className="flex items-center gap-2 text-amber-400 font-pixel text-xs">
                   <span>{isImportedRun ? '⚠️' : '🏆'}</span>
-                  <span>{isImportedRun ? 'SAVE AS UNVERIFIED LOCAL RUN' : 'NAME THIS RUN FOR THE LEADERBOARD'}</span>
+                  <span>{isImportedRun ? 'SAVE AS UNVERIFIED LOCAL RUN' : 'ENTER PLAYER NAME & ID # TAG'}</span>
                   <span>{isImportedRun ? '⚠️' : '🏆'}</span>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 w-full max-w-sm mt-0.5">
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    maxLength={20}
-                    value={runName}
-                    onChange={(e) => setRunName(e.target.value)}
-                    placeholder="e.g. Speedrun #1, First Clear..."
-                    className="flex-1 bg-slate-900 border-2 border-amber-400/80 px-3 py-1.5 text-center font-pixel text-xs text-yellow-300 tracking-wide focus:outline-none focus:ring-2 focus:ring-yellow-400 placeholder:text-slate-600"
-                  />
+                <div className="w-full max-w-sm flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 w-full">
+                    {/* Name Input */}
+                    <div className="relative flex-1">
+                      <input
+                        ref={inputRef}
+                        type="text"
+                        maxLength={18}
+                        value={playerName}
+                        onChange={(e) => setPlayerName(e.target.value)}
+                        placeholder={defaultSuggestedName}
+                        className="w-full bg-slate-900 border-2 border-amber-400/80 px-2.5 py-1.5 font-pixel text-xs text-yellow-300 tracking-wide focus:outline-none focus:ring-2 focus:ring-yellow-400 placeholder:text-slate-600"
+                      />
+                    </div>
+
+                    {/* # Tag Input & Reroll Button */}
+                    <div
+                      className="flex items-center bg-slate-900 border-2 border-cyan-400/80 px-2 py-1 font-mono text-xs text-cyan-300 shrink-0"
+                      title="Player identification tag (e.g. #1234) for event prizes"
+                    >
+                      <span className="text-cyan-500 select-none font-bold">#</span>
+                      <input
+                        type="text"
+                        maxLength={5}
+                        value={playerTag.replace(/^#/, '')}
+                        onChange={(e) => {
+                          const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, '').slice(0, 5);
+                          setPlayerTagState(`#${sanitized}`);
+                        }}
+                        className="w-12 bg-transparent text-cyan-300 font-mono text-xs font-bold focus:outline-none uppercase text-center"
+                        placeholder="1000"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sounds.playSelect();
+                          setPlayerTagState(generatePlayerTag());
+                        }}
+                        title="Reroll random 4-digit # tag"
+                        className="text-xs hover:scale-125 transition-transform cursor-pointer ml-1 select-none"
+                      >
+                        🎲
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Identification notice / preview */}
+                  <div className="flex justify-between items-center text-[8px] font-pixel px-0.5 text-slate-400">
+                    <span className="truncate pr-1">
+                      ID: <strong className="text-cyan-300 font-mono">{playerName.trim() || defaultSuggestedName}{playerTag.startsWith('#') ? playerTag : `#${playerTag}`}</strong>
+                    </span>
+                    <span className="text-amber-400/90 shrink-0">★ Verifies Event Prize Winners</span>
+                  </div>
+
+                  {/* Submit Button */}
                   <button
                     type="submit"
-                    className="px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-black font-pixel text-xs font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-md whitespace-nowrap"
+                    className="w-full py-2 bg-yellow-400 hover:bg-yellow-300 text-black font-pixel text-xs font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-md flex items-center justify-center gap-2"
                   >
-                    {isImportedRun ? 'RECORD LOCAL ➔' : 'RECORD RUN ➔'}
+                    <span>{isImportedRun ? 'RECORD LOCAL RUN ➔' : 'SUBMIT RECORD TO LEADERBOARD ➔'}</span>
                   </button>
                 </div>
               </form>
             ) : (
               <div className="bg-emerald-950/60 border-2 border-emerald-400 p-2.5 w-full flex flex-col items-center gap-1.5 shadow">
-                <span className="font-pixel text-xs text-emerald-300">
-                  ✓ RUN RECORDED AS &quot;{runName}&quot; {isImportedRun ? '(UNVERIFIED)' : ''}
-                </span>
+                <div className="flex items-center gap-1.5 font-pixel text-xs text-emerald-300 flex-wrap justify-center">
+                  <span>✓ RUN RECORDED AS &quot;{submittedRunName}&quot;</span>
+                  {submittedTag && (
+                    <span className="font-mono text-cyan-300 bg-cyan-950 border border-cyan-500/60 px-1.5 py-0.5 rounded-xs font-bold">
+                      {submittedTag}
+                    </span>
+                  )}
+                  {isImportedRun ? <span className="text-amber-400 font-bold">(UNVERIFIED)</span> : null}
+                </div>
                 {ranks && (
                   <div className="flex gap-2 text-[10px] font-pixel">
                     <span className="text-yellow-300 bg-yellow-950/80 border border-yellow-500/50 px-2 py-0.5 rounded shadow-xs">
@@ -339,7 +402,15 @@ export const GameEndingModal: React.FC<GameEndingModalProps> = ({
           <div className="w-full flex flex-col items-center gap-2">
             {submitted && ranks && (
               <div className="bg-yellow-950/80 border-2 border-yellow-400 px-3 py-1.5 w-full text-center font-pixel text-[11px] text-yellow-300 shadow flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-4">
-                <span>🎉 &quot;{runName}&quot; RECORDED!</span>
+                <div className="flex items-center gap-1.5">
+                  <span>🎉 &quot;{submittedRunName}&quot;</span>
+                  {submittedTag && (
+                    <span className="font-mono text-cyan-300 bg-cyan-950 border border-cyan-500/60 px-1 py-0.2 rounded-xs font-bold">
+                      {submittedTag}
+                    </span>
+                  )}
+                  <span>RECORDED!</span>
+                </div>
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-yellow-200 font-bold">⚡ Speed: #{ranks.time}</span>
                   <span>•</span>

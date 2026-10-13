@@ -11,6 +11,7 @@ import {
   resetGlobalLeaderboardAsync,
   getLastPlayerRunId,
   getMyRunIds,
+  parsePlayerIdentity,
 } from '../../utils/leaderboard';
 import { RunDetailsModal } from './RunDetailsModal';
 import { sounds } from '../../utils/audio';
@@ -355,7 +356,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               const rank = idx + 1;
               const isUserRun = entry.id === userRunId || entry.id === highlightId;
               const isNew = entry.id === highlightId;
-              const displayName = entry.runName || entry.playerName || `Run #${rank}`;
+              const identity = parsePlayerIdentity(entry);
               const artCount = getEntryArtifactCount(entry);
 
               const medal =
@@ -389,9 +390,17 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                   {/* Run Name & Explorer */}
                   <div className="col-span-4 text-left truncate flex flex-col justify-center pr-1">
                     <div className="flex items-center gap-1 truncate">
-                      <span className="tracking-wide group-hover:underline truncate" title={displayName}>
-                        {displayName}
+                      <span className="tracking-wide group-hover:underline truncate font-semibold" title={identity.fullName}>
+                        {identity.name}
                       </span>
+                      {identity.tag && (
+                        <span
+                          className="text-[8px] font-mono text-cyan-300 bg-cyan-950/80 border border-cyan-500/50 px-1 py-0.2 rounded-xs shrink-0 font-bold"
+                          title={`Player ID Tag: ${identity.tag}`}
+                        >
+                          {identity.tag}
+                        </span>
+                      )}
                       {isNew ? (
                         <span className="text-[7px] bg-yellow-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
                           NEW
@@ -453,7 +462,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                         }}
                         disabled={actionLoading}
                         className="ml-1 px-1.5 py-0.5 bg-red-900/90 hover:bg-red-700 text-white border border-red-400 text-[8px] rounded cursor-pointer active:scale-95 transition-all"
-                        title={`Admin: Delete "${displayName}"`}
+                        title={`Admin: Delete "${identity.fullName}"`}
                       >
                         🗑️
                       </button>
@@ -496,8 +505,13 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
               <div className="col-span-4 text-left truncate flex flex-col justify-center pr-1">
                 <div className="flex items-center gap-1 truncate">
                   <span className="tracking-wide underline truncate font-bold text-yellow-200">
-                    {userEntry.runName || userEntry.playerName || 'Your Run'}
+                    {parsePlayerIdentity(userEntry).name}
                   </span>
+                  {parsePlayerIdentity(userEntry).tag && (
+                    <span className="text-[7px] font-mono text-cyan-300 bg-cyan-950/90 border border-cyan-400/60 px-1 py-0.2 rounded-xs font-bold shrink-0">
+                      {parsePlayerIdentity(userEntry).tag}
+                    </span>
+                  )}
                   <span className="text-[7px] bg-yellow-400 text-black px-1 rounded-xs font-sans font-bold shrink-0">
                     YOU
                   </span>
@@ -662,7 +676,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
             </p>
 
             <div className="bg-slate-950 border border-slate-700 p-2 text-center font-pixel text-xs text-yellow-300">
-              "{targetToDelete.runName}" ({formatTime(targetToDelete.playtimeSeconds)})
+              "{parsePlayerIdentity(targetToDelete).fullName}" ({formatTime(targetToDelete.playtimeSeconds)})
             </div>
 
             <p className="font-pixel text-[9px] text-slate-400">

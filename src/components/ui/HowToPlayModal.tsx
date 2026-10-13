@@ -129,8 +129,8 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({ onClose }) => {
                 </div>
               </div>
             </div>
-            <div className="text-[8px] text-yellow-400/80 text-center mt-2 font-mono">
-              ★ Winners determined from the leaderboard at event conclusion ★
+            <div className="text-[8px] text-yellow-400/90 text-center mt-2 font-mono">
+              ★ Winners identified via unique # player tag on the Hall of Fame ★
             </div>
           </div>
         </div>

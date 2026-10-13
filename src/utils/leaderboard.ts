@@ -5,6 +5,7 @@ export interface LeaderboardEntry {
   id: string;
   runName: string;
   playerName?: string;
+  playerTag?: string;
   playtimeSeconds: number;
   totalKana: number;
   characterId: CharacterId;
@@ -19,6 +20,99 @@ export interface LeaderboardEntry {
 
 const LEADERBOARD_STORAGE_KEY = 'kana_escape_runs_leaderboard_v2';
 const OLD_STORAGE_KEY = 'kana_escape_leaderboard_v1';
+
+/**
+ * Generates a random 4-digit player discriminator tag (e.g. "#4829")
+ */
+export const generatePlayerTag = (): string => {
+  const num = Math.floor(1000 + Math.random() * 9000);
+  return `#${num}`;
+};
+
+/**
+ * Retrieves or creates the persistent player tag from localStorage
+ */
+export const getPlayerTag = (): string => {
+  try {
+    let tag = localStorage.getItem('kana_player_tag');
+    if (!tag || !/^#[a-zA-Z0-9]{3,6}$/.test(tag)) {
+      tag = generatePlayerTag();
+      localStorage.setItem('kana_player_tag', tag);
+    }
+    return tag;
+  } catch {
+    return '#1000';
+  }
+};
+
+/**
+ * Saves or updates the player's tag in localStorage
+ */
+export const setPlayerTag = (tag: string): string => {
+  try {
+    const trimmed = tag.trim();
+    const clean = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    const valid = clean.slice(0, 7);
+    localStorage.setItem('kana_player_tag', valid);
+    return valid;
+  } catch {
+    return tag;
+  }
+};
+
+/**
+ * Retrieves player's saved handle/name
+ */
+export const getSavedPlayerName = (): string => {
+  try {
+    return localStorage.getItem('kana_player_name') || '';
+  } catch {
+    return '';
+  }
+};
+
+export const setSavedPlayerName = (name: string): void => {
+  try {
+    localStorage.setItem('kana_player_name', name.trim().slice(0, 20));
+  } catch {}
+};
+
+/**
+ * Parses player display name and # tag discriminator.
+ * Supports explicit playerTag as well as compound names like "Alex#1234".
+ */
+export const parsePlayerIdentity = (entry: {
+  runName?: string;
+  playerName?: string;
+  playerTag?: string;
+}): {
+  name: string;
+  tag: string;
+  fullName: string;
+} => {
+  let explicitTag = entry.playerTag?.trim();
+  if (explicitTag && !explicitTag.startsWith('#')) {
+    explicitTag = `#${explicitTag}`;
+  }
+
+  let rawName = (entry.playerName || entry.runName || 'Explorer').trim();
+
+  // If there's no explicit playerTag, see if the name ends with a tag like #1234
+  if (!explicitTag) {
+    const match = rawName.match(/^(.*?)(#[a-zA-Z0-9]{3,6})$/);
+    if (match) {
+      rawName = match[1].trim();
+      explicitTag = match[2];
+    }
+  }
+
+  const name = rawName || 'Explorer';
+  const tag = explicitTag || '';
+  const fullName = tag ? `${name}${tag}` : name;
+
+  return { name, tag, fullName };
+};
+
 
 export const getLeaderboard = (): LeaderboardEntry[] => {
   try {
@@ -162,7 +256,9 @@ export const sortLeaderboard = (
 };
 
 export const saveLeaderboardEntry = (params: {
-  runName: string;
+  runName?: string;
+  playerName?: string;
+  playerTag?: string;
   playtimeSeconds: number;
   totalKana: number;
   characterId: CharacterId;
@@ -182,7 +278,19 @@ export const saveLeaderboardEntry = (params: {
   const characterName = char?.name || 'Explorer';
 
   const defaultSuggestedName = `Run #${current.length + 1}`;
-  const cleanName = params.runName.trim().slice(0, 20) || defaultSuggestedName;
+
+  // Process player ID tag
+  const rawTag = (params.playerTag || getPlayerTag()).trim();
+  const tag = rawTag ? (rawTag.startsWith('#') ? rawTag.slice(0, 7) : `#${rawTag.slice(0, 6)}`) : generatePlayerTag();
+  setPlayerTag(tag);
+
+  // Process player display name
+  const rawPlayerName = (params.playerName || params.runName || getSavedPlayerName() || defaultSuggestedName).trim();
+  const cleanPlayerName = rawPlayerName.replace(tag, '').trim().slice(0, 20) || defaultSuggestedName;
+  setSavedPlayerName(cleanPlayerName);
+
+  // Composite runName for backward compatibility and uniform display: e.g. "Alex#4829"
+  const fullRunName = cleanPlayerName.includes('#') ? cleanPlayerName : `${cleanPlayerName}${tag}`;
 
   const now = new Date();
   const formattedDate = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear().toString().slice(-2)}`;
@@ -192,8 +300,9 @@ export const saveLeaderboardEntry = (params: {
 
   const newEntry: LeaderboardEntry = {
     id: `run-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    runName: cleanName,
-    playerName: cleanName,
+    runName: fullRunName,
+    playerName: cleanPlayerName,
+    playerTag: tag,
     playtimeSeconds: params.playtimeSeconds,
     totalKana: params.totalKana,
     characterId: params.characterId,

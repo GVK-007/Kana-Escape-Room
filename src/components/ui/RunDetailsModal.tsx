@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { LeaderboardEntry, LeaderboardCategory, formatTime } from '../../utils/leaderboard';
+import { LeaderboardEntry, LeaderboardCategory, formatTime, parsePlayerIdentity } from '../../utils/leaderboard';
 import { lookupJapaneseWord } from '../../data/dictionary';
 import { sounds } from '../../utils/audio';
 
@@ -23,6 +23,7 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, c
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
+  const identity = parsePlayerIdentity(entry);
   const words = entry.craftedWords && entry.craftedWords.length > 0
     ? entry.craftedWords
     : ['でぐち']; // Exit word at minimum
@@ -41,8 +42,13 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, c
               <span className="font-pixel text-[9px] text-yellow-300 block">
                 {rankLabel} #{rank}
               </span>
-              <h3 className="font-pixel text-xs sm:text-sm text-white tracking-wider truncate max-w-[220px]">
-                {entry.runName}
+              <h3 className="font-pixel text-xs sm:text-sm text-white tracking-wider truncate max-w-[220px] flex items-center gap-1.5">
+                <span className="truncate">{identity.name}</span>
+                {identity.tag && (
+                  <span className="font-mono text-[9px] text-cyan-300 bg-cyan-950/90 border border-cyan-500/70 px-1.5 py-0.5 rounded-xs shrink-0 font-bold">
+                    {identity.tag}
+                  </span>
+                )}
               </h3>
             </div>
           </div>
@@ -56,6 +62,16 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, c
             ESC
           </button>
         </div>
+
+        {/* Player Identifier Tag Badge */}
+        {identity.tag && (
+          <div className="w-full bg-cyan-950/40 border border-cyan-500/40 px-2.5 py-1.5 flex items-center justify-between text-[9px] font-pixel">
+            <span className="text-slate-400">PLAYER IDENTIFIER:</span>
+            <span className="text-cyan-300 font-mono font-bold tracking-wider">
+              {identity.fullName}
+            </span>
+          </div>
+        )}
 
         {/* Unverified Warning Badge */}
         {(entry.isImported || entry.verified === false) && (

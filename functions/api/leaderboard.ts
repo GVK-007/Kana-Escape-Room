@@ -2,6 +2,7 @@ export interface LeaderboardEntry {
   id: string;
   runName: string;
   playerName?: string;
+  playerTag?: string;
   playtimeSeconds: number;
   totalKana: number;
   characterId: string;
@@ -165,8 +166,9 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       ...newEntry,
       verified: true,
       isImported: false,
-      runName: String(newEntry.runName || 'Explorer').slice(0, 30),
+      runName: String(newEntry.runName || 'Explorer').slice(0, 35),
       playerName: String(newEntry.playerName || newEntry.runName || 'Explorer').slice(0, 30),
+      playerTag: newEntry.playerTag ? String(newEntry.playerTag).slice(0, 10) : undefined,
       timestamp: Date.now(),
     };
 

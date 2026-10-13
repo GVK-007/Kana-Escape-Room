@@ -5,6 +5,7 @@ import { getCharacterSprite } from '../../utils/pixelArt';
 import { sounds } from '../../utils/audio';
 import { LeaderboardModal } from './LeaderboardModal';
 import { HowToPlayModal } from './HowToPlayModal';
+import { getPlayerTag } from '../../utils/leaderboard';
 
 interface TitleScreenProps {
   hasSaveData: boolean;
@@ -43,11 +44,21 @@ export const TitleScreen: React.FC<TitleScreenProps> = ({
 
   const currentChar = CHARACTERS.find((c) => c.id === selectedCharacter) || CHARACTERS[0];
 
+  const playerTag = getPlayerTag();
+
   return (
     <div className="fixed inset-0 z-40 bg-[#0c0b18] wagara-ichimatsu bg-opacity-90 flex flex-col items-center justify-between p-6 select-none overflow-y-auto">
       {/* Top Header / Sound Toggle */}
       <div className="w-full max-w-3xl flex justify-between items-center text-xs font-pixel text-slate-400">
-        <span className="text-[10px] text-amber-500/80">PIXEL-ART ADVENTURE</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] text-amber-500/80">PIXEL-ART ADVENTURE</span>
+          <span
+            className="text-[9px] font-mono text-cyan-400 bg-cyan-950/70 border border-cyan-500/50 px-1.5 py-0.5 rounded-xs"
+            title="Your unique identification # tag for event prizes"
+          >
+            ID: {playerTag}
+          </span>
+        </div>
         <button
           onClick={onToggleVolume}
           className="px-2.5 py-1 bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-300 cursor-pointer text-[10px]"
