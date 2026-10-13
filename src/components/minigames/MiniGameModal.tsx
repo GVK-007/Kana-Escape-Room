@@ -130,28 +130,21 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
     }
   };
 
-  const isShortScreen = windowSize.height < 560;
   const isLandscape = windowSize.width > windowSize.height;
-  const targetH = isShortScreen && isLandscape ? 430 : 490;
-  const targetW = isShortScreen && isLandscape ? 620 : 680;
-  const availH = Math.max(240, windowSize.height - 12);
-  const availW = Math.max(300, windowSize.width - 16);
-  const scale = Math.min(1, availH / targetH, availW / targetW);
-  const shouldScale = scale < 0.98;
+  const isShortLandscape = isLandscape && windowSize.height < 520;
+  const availGameH = Math.max(200, windowSize.height - 65);
+  const gameScale = isShortLandscape ? Math.min(1, Math.max(0.68, availGameH / 340)) : 1;
+  const shouldScaleGame = isShortLandscape && gameScale < 0.98;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-1 select-none overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-1 select-none overflow-y-auto">
       <div
-        style={{
-          transform: shouldScale ? `scale(${scale})` : undefined,
-          transformOrigin: 'center center',
-        }}
-        className={`relative bg-[#1a192f] border-4 border-[#3b3a58] pixel-box p-2.5 sm:p-5 max-w-xl md:max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full flex flex-col items-center shadow-2xl ${
-          shouldScale ? 'overflow-hidden' : 'max-h-[96dvh] overflow-y-auto'
-        }`}
+        className={`relative bg-[#1a192f] border-4 border-[#3b3a58] pixel-box ${
+          isShortLandscape ? 'p-1.5 sm:p-2.5 max-w-2xl' : 'p-3 sm:p-5 max-w-xl md:max-w-2xl'
+        } w-full flex flex-col items-center shadow-2xl max-h-[98dvh] overflow-y-auto my-auto`}
       >
-        {/* Compact Cabinet Header with integrated Reward indicator */}
-        <div className="flex justify-between items-center w-full pb-2 border-b-2 border-slate-700/80 mb-2 sm:mb-3">
+        {/* Compact Sticky Cabinet Header with integrated Reward indicator (always reachable) */}
+        <div className="sticky top-0 z-30 bg-[#1a192f] flex justify-between items-center w-full pb-1 sm:pb-2 border-b-2 border-slate-700/80 mb-1 sm:mb-2 shrink-0">
           <div className="flex items-center gap-2 flex-wrap min-w-0">
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="w-2.5 h-2.5 bg-red-500 rounded-none animate-ping" />
@@ -196,7 +189,14 @@ export const MiniGameModal: React.FC<MiniGameModalProps> = ({
         </div>
 
         {/* Active Minigame with natural flex-col flow (instant local load) */}
-        <div key={resetKey} className="w-full flex flex-col items-center justify-start py-1">
+        <div
+          key={resetKey}
+          style={{
+            transform: shouldScaleGame ? `scale(${gameScale})` : undefined,
+            transformOrigin: 'top center',
+          }}
+          className="w-full flex flex-col items-center justify-start py-0.5 shrink-0"
+        >
           {renderGame()}
         </div>
 

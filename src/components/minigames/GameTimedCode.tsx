@@ -27,7 +27,7 @@ const JAPANESE_DIGITS: Record<string, JapaneseDigitInfo> = {
   '9': { digit: '9', kanji: '九', romaji: 'kyuu', kana: 'きゅう' },
 };
 
-const TOTAL_TIME = 15;
+const TOTAL_TIME = 20;
 
 export const GameTimedCode: React.FC<GameTimedCodeProps> = ({ onSuccess, codeLength = 4 }) => {
   const [targetCode, setTargetCode] = useState<string>('');

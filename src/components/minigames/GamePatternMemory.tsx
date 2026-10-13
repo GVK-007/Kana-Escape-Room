@@ -57,9 +57,9 @@ export const GamePatternMemory: React.FC<GamePatternMemoryProps> = ({ onSuccess,
     setSequence(newSeq);
     seqRef.current = newSeq;
 
-    // Flash sequence with timing that gets progressively faster on each stage!
-    const flashSpeed = Math.max(180, 580 - (currentStage - 1) * 85);
-    const activeDuration = Math.max(100, Math.floor(flashSpeed * 0.6));
+    // Flash sequence with clear timing that is fun and recognizable
+    const flashSpeed = Math.max(280, 600 - (currentStage - 1) * 60);
+    const activeDuration = Math.max(160, Math.floor(flashSpeed * 0.65));
 
     let idx = 0;
     const interval = window.setInterval(() => {
@@ -76,8 +76,11 @@ export const GamePatternMemory: React.FC<GamePatternMemoryProps> = ({ onSuccess,
         idx++;
       } else {
         clearInterval(interval);
-        setIsShowingPattern(false);
-        isShowingPatternRef.current = false;
+        const bufferTimer = window.setTimeout(() => {
+          setIsShowingPattern(false);
+          isShowingPatternRef.current = false;
+        }, 150);
+        timersRef.current.push(bufferTimer);
       }
     }, flashSpeed);
     timersRef.current.push(interval);
