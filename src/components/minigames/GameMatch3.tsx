@@ -30,7 +30,7 @@ interface Particle {
   size: number;
 }
 
-export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore = 150 }) => {
+export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore = 500 }) => {
   const [grid, setGrid] = useState<number[][]>(() => createInitialGrid());
   const [specialGrid, setSpecialGrid] = useState<string[][]>(() =>
     Array(ROWS).fill(null).map(() => Array(COLS).fill(''))
@@ -38,6 +38,9 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
   const [selectedCell, setSelectedCell] = useState<{ r: number; c: number } | null>(null);
   const [score, setScore] = useState(0);
   const [won, setWon] = useState(false);
+  const [poppingCells, setPoppingCells] = useState<Set<string>>(new Set());
+  const [droppingCells, setDroppingCells] = useState<Set<string>>(new Set());
+  const [isBusy, setIsBusy] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const particlesRef = useRef<Particle[]>([]);
@@ -185,35 +188,51 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
     return { matched, powerUpsToSpawn };
   };
 
-  const processMatches = useCallback(
-    (g: number[][], currentScore: number, sGrid: string[][]) => {
-      const { matched, powerUpsToSpawn } = findMatchesAndSpecials(g);
-      if (matched.size === 0) return { newGrid: g, newScore: currentScore, newSGrid: sGrid, hadMatches: false };
+  const checkWin = useCallback(
+    (s: number) => {
+      if (s >= targetScore && !won) {
+        setWon(true);
+        sounds.playSuccess();
+        setTimeout(() => onSuccessRef.current(), 750);
+      }
+    },
+    [targetScore, won]
+  );
+
+  const executeMatchStep = useCallback(
+    (
+      currentGrid: number[][],
+      currentSpecial: string[][],
+      currentScore: number,
+      onComplete: () => void
+    ) => {
+      const { matched, powerUpsToSpawn } = findMatchesAndSpecials(currentGrid);
+      if (matched.size === 0) {
+        onComplete();
+        return;
+      }
 
       sounds.playKanaObtained();
-      const nextG = g.map((row) => [...row]);
-      const nextSGrid = sGrid.map((row) => [...row]);
+      const allMatched = new Set(matched);
 
       // Check if any matched tile was a special power-up!
-      matched.forEach((coord) => {
+      allMatched.forEach((coord) => {
         const [r, c] = coord.split(',').map(Number);
-        const special = sGrid[r][c];
+        const special = currentSpecial[r][c];
 
         if (special === 'LINE_BOMB') {
-          // Clear entire row and column!
           sounds.playSuccess();
           for (let i = 0; i < COLS; i++) {
-            matched.add(`${r},${i}`);
+            allMatched.add(`${r},${i}`);
             spawnParticles(i * 42 + 20, r * 42 + 20, '#facc15', 12, 5.0);
           }
         } else if (special === 'RAINBOW') {
-          // Clear all of target color!
           sounds.playSuccess();
-          const targetColor = g[r][c];
+          const targetColor = currentGrid[r][c];
           for (let rowIdx = 0; rowIdx < ROWS; rowIdx++) {
             for (let colIdx = 0; colIdx < COLS; colIdx++) {
-              if (g[rowIdx][colIdx] === targetColor) {
-                matched.add(`${rowIdx},${colIdx}`);
+              if (currentGrid[rowIdx][colIdx] === targetColor) {
+                allMatched.add(`${rowIdx},${colIdx}`);
                 spawnParticles(colIdx * 42 + 20, rowIdx * 42 + 20, '#ec4899', 12, 5.5);
               }
             }
@@ -222,55 +241,83 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
       });
 
       // Clear matched cells and trigger particle effects
-      matched.forEach((coord) => {
+      allMatched.forEach((coord) => {
         const [r, c] = coord.split(',').map(Number);
-        const tileVal = nextG[r][c];
+        const tileVal = currentGrid[r][c];
         const hex = TILES[tileVal]?.hex || '#facc15';
         spawnParticles(c * 42 + 20, r * 42 + 20, hex, 12, 3.8);
-
-        nextG[r][c] = -1;
-        nextSGrid[r][c] = '';
       });
 
-      // Place newly created powerups
-      powerUpsToSpawn.forEach((p) => {
-        nextG[p.r][p.c] = getRandomTile();
-        nextSGrid[p.r][p.c] = p.type;
-        spawnParticles(p.c * 42 + 20, p.r * 42 + 20, '#ffffff', 20, 5.0);
-      });
+      // Step 1: Pop animation
+      setPoppingCells(allMatched);
 
-      const addedPoints = matched.size * 10 + powerUpsToSpawn.length * 50;
-      const nextScore = currentScore + addedPoints;
+      setTimeout(() => {
+        // Step 2: Clear popped cells and calculate tile drop
+        const nextG = currentGrid.map((row) => [...row]);
+        const nextSGrid = currentSpecial.map((row) => [...row]);
 
-      // Drop tiles
-      for (let c = 0; c < COLS; c++) {
-        const colValues = [];
-        const colSpecials = [];
-        for (let r = 0; r < ROWS; r++) {
-          if (nextG[r][c] !== -1) {
-            colValues.push(nextG[r][c]);
-            colSpecials.push(nextSGrid[r][c]);
+        allMatched.forEach((coord) => {
+          const [r, c] = coord.split(',').map(Number);
+          nextG[r][c] = -1;
+          nextSGrid[r][c] = '';
+        });
+
+        // Place newly created powerups
+        powerUpsToSpawn.forEach((p) => {
+          nextG[p.r][p.c] = getRandomTile();
+          nextSGrid[p.r][p.c] = p.type;
+          spawnParticles(p.c * 42 + 20, p.r * 42 + 20, '#ffffff', 20, 5.0);
+        });
+
+        const addedPoints = allMatched.size * 10 + powerUpsToSpawn.length * 50;
+        const nextScore = currentScore + addedPoints;
+
+        // Drop tiles in each column
+        const droppingSet = new Set<string>();
+        for (let c = 0; c < COLS; c++) {
+          const colValues: number[] = [];
+          const colSpecials: string[] = [];
+          for (let r = 0; r < ROWS; r++) {
+            if (nextG[r][c] !== -1) {
+              colValues.push(nextG[r][c]);
+              colSpecials.push(nextSGrid[r][c]);
+            }
+          }
+          const missingCount = ROWS - colValues.length;
+          while (colValues.length < ROWS) {
+            colValues.unshift(getRandomTile());
+            colSpecials.unshift('');
+          }
+          for (let r = 0; r < ROWS; r++) {
+            if (r < missingCount || nextG[r][c] !== colValues[r]) {
+              droppingSet.add(`${r},${c}`);
+            }
+            nextG[r][c] = colValues[r];
+            nextSGrid[r][c] = colSpecials[r];
           }
         }
-        while (colValues.length < ROWS) {
-          colValues.unshift(getRandomTile());
-          colSpecials.unshift('');
-        }
-        for (let r = 0; r < ROWS; r++) {
-          nextG[r][c] = colValues[r];
-          nextSGrid[r][c] = colSpecials[r];
-        }
-      }
 
-      return { newGrid: nextG, newScore: nextScore, newSGrid: nextSGrid, hadMatches: true };
+        setScore(nextScore);
+        setPoppingCells(new Set());
+        setDroppingCells(droppingSet);
+        setGrid(nextG);
+        setSpecialGrid(nextSGrid);
+        checkWin(nextScore);
+
+        setTimeout(() => {
+          setDroppingCells(new Set());
+          // Cascade check!
+          executeMatchStep(nextG, nextSGrid, nextScore, onComplete);
+        }, 300);
+      }, 250);
     },
-    []
+    [checkWin]
   );
 
   const touchStartRef = useRef<{ r: number; c: number; x: number; y: number } | null>(null);
 
   const swapCells = (sr: number, sc: number, r: number, c: number) => {
-    if (won) return;
+    if (won || isBusy) return;
     if (r < 0 || r >= ROWS || c < 0 || c >= COLS) return;
 
     sounds.playBlip(540);
@@ -285,26 +332,16 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
     swappedS[sr][sc] = swappedS[r][c];
     swappedS[r][c] = tempS;
 
-    const { newGrid, newScore, newSGrid, hadMatches } = processMatches(swapped, score, swappedS);
+    const { matched } = findMatchesAndSpecials(swapped);
 
-    if (hadMatches) {
-      setGrid(newGrid);
-      setSpecialGrid(newSGrid);
-      setScore(newScore);
+    if (matched.size > 0) {
+      setIsBusy(true);
       setSelectedCell(null);
-
-      // Cascade check
-      setTimeout(() => {
-        const cascade = processMatches(newGrid, newScore, newSGrid);
-        if (cascade.hadMatches) {
-          setGrid(cascade.newGrid);
-          setSpecialGrid(cascade.newSGrid);
-          setScore(cascade.newScore);
-          checkWin(cascade.newScore);
-        }
-      }, 350);
-
-      checkWin(newScore);
+      setGrid(swapped);
+      setSpecialGrid(swappedS);
+      executeMatchStep(swapped, swappedS, score, () => {
+        setIsBusy(false);
+      });
     } else {
       sounds.playFail();
       setSelectedCell(null);
@@ -312,7 +349,7 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
   };
 
   const handleCellClick = (r: number, c: number) => {
-    if (won) return;
+    if (won || isBusy) return;
 
     if (!selectedCell) {
       sounds.playSelect();
@@ -332,12 +369,12 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
   };
 
   const handleTouchStartCell = (e: React.TouchEvent, r: number, c: number) => {
-    if (won || e.touches.length === 0) return;
+    if (won || isBusy || e.touches.length === 0) return;
     touchStartRef.current = { r, c, x: e.touches[0].clientX, y: e.touches[0].clientY };
   };
 
   const handleTouchEndCell = (e: React.TouchEvent, r: number, c: number) => {
-    if (!touchStartRef.current || won) return;
+    if (!touchStartRef.current || won || isBusy) return;
     const start = touchStartRef.current;
     touchStartRef.current = null;
 
@@ -357,14 +394,6 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
       if (targetR >= 0 && targetR < ROWS && targetC >= 0 && targetC < COLS) {
         swapCells(start.r, start.c, targetR, targetC);
       }
-    }
-  };
-
-  const checkWin = (s: number) => {
-    if (s >= targetScore && !won) {
-      setWon(true);
-      sounds.playSuccess();
-      setTimeout(() => onSuccessRef.current(), 750);
     }
   };
 
@@ -388,6 +417,8 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
             {grid.flatMap((row, r) =>
               row.map((val, c) => {
                 const isSelected = selectedCell?.r === r && selectedCell?.c === c;
+                const isPopping = poppingCells.has(`${r},${c}`);
+                const isDropping = droppingCells.has(`${r},${c}`);
                 const tile = TILES[val] || TILES[0];
                 const special = specialGrid[r][c];
 
@@ -397,10 +428,14 @@ export const GameMatch3: React.FC<GameMatch3Props> = ({ onSuccess, targetScore =
                     onClick={() => handleCellClick(r, c)}
                     onTouchStart={(e) => handleTouchStartCell(e, r, c)}
                     onTouchEnd={(e) => handleTouchEndCell(e, r, c)}
-                    className={`w-full h-full aspect-square border-2 rounded flex items-center justify-center font-kana text-xl sm:text-2xl md:text-3xl font-bold cursor-pointer transition-all duration-200 relative animate-in slide-in-from-top-4 touch-manipulation ${
+                    className={`w-full h-full aspect-square border-2 rounded flex items-center justify-center font-kana text-xl sm:text-2xl md:text-3xl font-bold cursor-pointer transition-all duration-200 relative touch-manipulation ${
                       tile.color
                     } ${
-                      isSelected
+                      isPopping
+                        ? 'scale-125 opacity-0 z-20 pointer-events-none duration-200'
+                        : isDropping
+                        ? 'animate-in slide-in-from-top-6 duration-300 ease-out'
+                        : isSelected
                         ? 'scale-110 border-white ring-2 ring-yellow-400 z-10 shadow-lg'
                         : 'hover:opacity-90 active:scale-95'
                     }`}

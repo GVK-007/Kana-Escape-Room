@@ -29,11 +29,11 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
     paddleW: 6,
     ballX: 130,
     ballY: 100,
-    ballVx: -2.0,
-    ballVy: 1.2,
-    baseSpeed: 2.0,
-    hits: 0,
-    exchanges: 0,
+    ballVx: -2.3,
+    ballVy: 1.0,
+    baseSpeed: 2.3,
+    rallyHits: 0,
+    aiErrorY: 0,
     playerScore: 0,
     aiScore: 0,
     won: false,
@@ -45,12 +45,12 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
     const s = stateRef.current;
     s.ballX = 130;
     s.ballY = 100;
-    s.hits = 0;
-    s.exchanges = 0;
+    s.rallyHits = 0;
+    s.aiErrorY = (Math.random() - 0.5) * 16;
     setExchanges(0);
-    const speed = 2.0;
+    const speed = s.baseSpeed;
     s.ballVx = towardsPlayer ? -speed : speed;
-    s.ballVy = (Math.random() - 0.5) * 2.5;
+    s.ballVy = (Math.random() - 0.5) * 2.2;
     setSpeedMultiplier(1.0);
   };
 
@@ -59,7 +59,7 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
     stateRef.current.aiScore = 0;
     stateRef.current.won = false;
     stateRef.current.gameOver = false;
-    stateRef.current.exchanges = 0;
+    stateRef.current.rallyHits = 0;
     setPlayerScore(0);
     setAiScore(0);
     setExchanges(0);
@@ -77,30 +77,36 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
 
-    const loop = () => {
+    const updatePhysics = (dt: number = 1.0) => {
       const s = stateRef.current;
 
       // Player input
-      if (s.keys.up) s.playerY = Math.max(4, s.playerY - 3.5);
-      if (s.keys.down) s.playerY = Math.min(200 - s.paddleH - 4, s.playerY + 3.5);
+      if (s.keys.up) s.playerY = Math.max(4, s.playerY - 4.2 * dt);
+      if (s.keys.down) s.playerY = Math.min(200 - s.paddleH - 4, s.playerY + 4.2 * dt);
 
-      // AI movement logic: 5% compounding speed reduction per exchange!
-      const baseAiSpeed = 2.85;
-      const currentAiSpeed = baseAiSpeed * Math.pow(0.95, s.exchanges);
+      // Humanized AI movement: only actively tracks when ball is traveling toward AI
+      let targetAiY: number;
+      if (s.ballVx > 0) {
+        targetAiY = s.ballY + s.aiErrorY - s.paddleH / 2;
+      } else {
+        // Drifts back towards center court waiting for next volley
+        targetAiY = 100 - s.paddleH / 2;
+      }
 
-      const aiCenter = s.aiY + s.paddleH / 2;
-      const targetAiY = s.ballY + s.ballVy * 4;
-
-      if (aiCenter < targetAiY - 2) {
-        s.aiY = Math.min(200 - s.paddleH - 4, s.aiY + currentAiSpeed);
-      } else if (aiCenter > targetAiY + 2) {
-        s.aiY = Math.max(4, s.aiY - currentAiSpeed);
+      const aiSpeed = 2.6 * dt;
+      if (s.aiY < targetAiY - 2) {
+        s.aiY = Math.min(200 - s.paddleH - 4, s.aiY + aiSpeed);
+      } else if (s.aiY > targetAiY + 2) {
+        s.aiY = Math.max(4, s.aiY - aiSpeed);
       }
 
       if (!s.won && !s.gameOver) {
-        s.ballX += s.ballVx;
-        s.ballY += s.ballVy;
+        s.ballX += s.ballVx * dt;
+        s.ballY += s.ballVy * dt;
 
         // Top/Bottom walls
         if (s.ballY <= 4) {
@@ -117,20 +123,21 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
         if (
           s.ballX <= 18 &&
           s.ballX >= 10 &&
-          s.ballY >= s.playerY - 2 &&
-          s.ballY <= s.playerY + s.paddleH + 2
+          s.ballY >= s.playerY - 3 &&
+          s.ballY <= s.playerY + s.paddleH + 3
         ) {
-          s.hits += 1;
-          // Each exchange between player and AI reduces AI speed by 5% compounding (in background)!
-          s.exchanges += 1;
-          setExchanges(s.exchanges);
-
-          const factor = 1 + s.hits * 0.1;
+          s.rallyHits += 1;
+          const factor = Math.min(2.2, 1 + s.rallyHits * 0.12);
           setSpeedMultiplier(factor);
+          setExchanges(s.rallyHits);
 
-          const offset = (s.ballY - (s.playerY + s.paddleH / 2)) / (s.paddleH / 2);
+          const hitOffset = (s.ballY - (s.playerY + s.paddleH / 2)) / (s.paddleH / 2);
           s.ballVx = Math.abs(s.baseSpeed * factor);
-          s.ballVy = offset * (2.0 * factor);
+          s.ballVy = hitOffset * (2.8 * factor);
+
+          // Sharper hit angle increases AI tracking difficulty
+          s.aiErrorY = hitOffset * 18 + (Math.random() - 0.5) * 12;
+
           sounds.playBlip(620);
         }
 
@@ -138,16 +145,17 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
         if (
           s.ballX >= 242 &&
           s.ballX <= 250 &&
-          s.ballY >= s.aiY - 2 &&
-          s.ballY <= s.aiY + s.paddleH + 2
+          s.ballY >= s.aiY - 3 &&
+          s.ballY <= s.aiY + s.paddleH + 3
         ) {
-          s.hits += 1;
-          const factor = 1 + s.hits * 0.1;
+          s.rallyHits += 1;
+          const factor = Math.min(2.2, 1 + s.rallyHits * 0.12);
           setSpeedMultiplier(factor);
+          setExchanges(s.rallyHits);
 
-          const offset = (s.ballY - (s.aiY + s.paddleH / 2)) / (s.paddleH / 2);
+          const hitOffset = (s.ballY - (s.aiY + s.paddleH / 2)) / (s.paddleH / 2);
           s.ballVx = -Math.abs(s.baseSpeed * factor);
-          s.ballVy = offset * (2.0 * factor);
+          s.ballVy = hitOffset * (2.4 * factor);
           sounds.playBlip(520);
         }
 
@@ -157,7 +165,7 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
           setAiScore(s.aiScore);
           sounds.playFail();
 
-          if (s.aiScore >= 3) {
+          if (s.aiScore >= targetPointsRef.current) {
             s.gameOver = true;
             setGameOver(true);
           } else {
@@ -180,6 +188,24 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
           }
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const s = stateRef.current;
 
       // Draw Arena
       ctx.fillStyle = '#0a0a1a';
@@ -278,7 +304,7 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
         {won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in">
             <span className="text-emerald-400 text-sm sm:text-base mb-1 font-bold">★ PONG CHAMPION! ★</span>
-            <span className="text-xs text-slate-300 mb-3">AI servo speed steadily outpaced!</span>
+            <span className="text-xs text-slate-300 mb-3">Precision paddle angle slices outmaneuvered the AI!</span>
             <button
               onClick={() => onSuccessRef.current()}
               className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-lg"
@@ -324,7 +350,7 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
       </div>
 
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        W/S or Up/Down • Ball accelerates on each exchange!
+        W/S or Up/Down • Slice with the paddle edges to drive fast, angled shots!
       </p>
     </div>
   );

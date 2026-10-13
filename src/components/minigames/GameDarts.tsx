@@ -79,8 +79,14 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
     s.sliderYDir = Math.sign(s.sliderYDir) * BASE_SPEED * nextSpeed;
   };
 
-  // Immediate input action - zero delay!
+  const lastActionTimeRef = useRef(0);
+
+  // Immediate input action - with 400ms debounce to prevent touch double-triggering
   const triggerPlayerAction = () => {
+    const now = performance.now();
+    if (now - lastActionTimeRef.current < 400) return;
+    lastActionTimeRef.current = now;
+
     const s = stateRef.current;
     if (s.won || s.gameOver) return;
 
@@ -138,13 +144,16 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
 
-    const loop = () => {
+    const updatePhysics = (dt: number = 1.0) => {
       const s = stateRef.current;
 
       // Update Sliders based on current active phase
       if (s.phase === 'PLAYER_X' || s.phase === 'AI_X') {
-        s.sliderX += s.sliderXDir;
+        s.sliderX += s.sliderXDir * dt;
         if (s.sliderX >= 235) {
           s.sliderX = 235;
           s.sliderXDir = -Math.abs(s.sliderXDir);
@@ -155,7 +164,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
 
         // AI automated aiming logic for X
         if (s.phase === 'AI_X') {
-          s.aiTimer += 1;
+          s.aiTimer += dt;
           const diff = Math.abs(s.sliderX - s.aiTargetX);
           if ((diff < 8 && s.aiTimer > 15) || s.aiTimer > 75) {
             sounds.playBlip(480);
@@ -165,7 +174,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
           }
         }
       } else if (s.phase === 'PLAYER_Y' || s.phase === 'AI_Y') {
-        s.sliderY += s.sliderYDir;
+        s.sliderY += s.sliderYDir * dt;
         if (s.sliderY >= 205) {
           s.sliderY = 205;
           s.sliderYDir = -Math.abs(s.sliderYDir);
@@ -176,7 +185,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
 
         // AI automated aiming logic for Y
         if (s.phase === 'AI_Y') {
-          s.aiTimer += 1;
+          s.aiTimer += dt;
           const diff = Math.abs(s.sliderY - s.aiTargetY);
           if ((diff < 8 && s.aiTimer > 15) || s.aiTimer > 75) {
             sounds.playSelect();
@@ -210,6 +219,24 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
           }
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const s = stateRef.current;
 
       // --- RENDER DART ARENA ---
       ctx.fillStyle = '#080816';
@@ -363,8 +390,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
           ref={canvasRef}
           width={260}
           height={240}
-          onMouseDown={triggerPlayerAction}
-          onTouchStart={(e) => {
+          onPointerDown={(e) => {
             e.preventDefault();
             triggerPlayerAction();
           }}
@@ -402,8 +428,7 @@ export const GameDarts: React.FC<GameDartsProps> = ({ onSuccess }) => {
       </div>
 
       <button
-        onMouseDown={triggerPlayerAction}
-        onTouchStart={(e) => {
+        onPointerDown={(e) => {
           e.preventDefault();
           triggerPlayerAction();
         }}

@@ -6,13 +6,14 @@ interface GameNutsAndBoltsProps {
   onFailure?: () => void;
 }
 
-const MAX_CAPACITY = 3;
+const MAX_CAPACITY = 4;
 
 const COLORS: Record<string, { bg: string; border: string; name: string }> = {
   R: { bg: '#ef4444', border: '#b91c1c', name: 'RED' },
   B: { bg: '#3b82f6', border: '#1d4ed8', name: 'BLUE' },
   G: { bg: '#10b981', border: '#047857', name: 'GREEN' },
   Y: { bg: '#eab308', border: '#a16207', name: 'YELLOW' },
+  P: { bg: '#a855f7', border: '#7e22ce', name: 'PURPLE' },
 };
 
 export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess }) => {
@@ -26,22 +27,26 @@ export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess })
 
   function initBolts(): string[][] {
     return [
-      ['R', 'B', 'G'], // Bolt 0
-      ['B', 'G', 'R'], // Bolt 1
-      ['G', 'R', 'B'], // Bolt 2
-      [],              // Bolt 3 (Empty)
-      [],              // Bolt 4 (Empty)
+      ['R', 'B', 'P', 'Y'], // Bolt 0
+      ['G', 'Y', 'R', 'P'], // Bolt 1
+      ['P', 'G', 'Y', 'B'], // Bolt 2
+      ['B', 'P', 'G', 'R'], // Bolt 3
+      ['Y', 'R', 'B', 'G'], // Bolt 4
+      [],                   // Bolt 5 (Empty)
+      [],                   // Bolt 6 (Empty)
     ];
   }
 
   const checkWin = (currentBolts: string[][]): boolean => {
+    let completedBolts = 0;
     for (const bolt of currentBolts) {
       if (bolt.length === 0) continue;
       if (bolt.length !== MAX_CAPACITY) return false;
       const firstColor = bolt[0];
       if (!bolt.every((c) => c === firstColor)) return false;
+      completedBolts++;
     }
-    return true;
+    return completedBolts === 5;
   };
 
   // Helper: Count consecutive same-color nuts at top of a bolt
@@ -127,10 +132,10 @@ export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess })
   };
 
   return (
-    <div className="flex flex-col items-center select-none font-pixel w-full max-w-[580px]">
+    <div className="flex flex-col items-center select-none font-pixel w-full max-w-[620px]">
       <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm">
         <span className="text-amber-400 font-bold">MOVES: {moves}</span>
-        <span className="text-cyan-400 text-[10px] sm:text-xs">MATCHED NUTS MOVE TOGETHER</span>
+        <span className="text-yellow-400 font-mono text-[10px] sm:text-xs">5 COLORS • 7 RODS (EXPERT)</span>
         <button
           onClick={restart}
           className="text-slate-400 hover:text-white underline cursor-pointer text-xs sm:text-sm"
@@ -139,9 +144,9 @@ export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess })
         </button>
       </div>
 
-      <div className="bg-slate-950 p-4 sm:p-6 border-4 border-slate-700 shadow-2xl w-full flex flex-col items-center relative">
+      <div className="bg-slate-950 p-2 sm:p-5 border-4 border-slate-700 shadow-2xl w-full flex flex-col items-center relative">
         {/* Bolts Arena */}
-        <div className="flex justify-around items-end w-full h-64 sm:h-72 bg-slate-900 border-2 border-slate-800 p-3 sm:p-5 pt-8 rounded-md">
+        <div className="flex justify-around items-end w-full h-64 sm:h-72 bg-slate-900 border-2 border-slate-800 p-1 sm:p-3 pt-8 rounded-md gap-0.5 sm:gap-1">
           {bolts.map((bolt, idx) => {
             const isSelected = selectedBoltIdx === idx;
             const topSameCount = getTopSameColorCount(bolt);
@@ -150,15 +155,15 @@ export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess })
               <button
                 key={idx}
                 onClick={() => handleBoltClick(idx)}
-                className={`relative flex flex-col-reverse items-center w-16 sm:w-20 h-52 sm:h-56 cursor-pointer group transition-all ${
+                className={`relative flex flex-col-reverse items-center w-10 min-[400px]:w-12 sm:w-15 md:w-17 h-54 sm:h-62 cursor-pointer group transition-all ${
                   isSelected ? 'scale-105' : ''
                 }`}
               >
                 {/* Vertical Steel Rod / Bolt */}
-                <div className="absolute top-2 bottom-0 w-3.5 sm:w-4 bg-slate-600 border border-slate-400 rounded-t-sm shadow-inner" />
+                <div className="absolute top-2 bottom-0 w-2.5 sm:w-3 bg-slate-600 border border-slate-400 rounded-t-sm shadow-inner" />
 
                 {/* Base mount */}
-                <div className="w-13 sm:w-16 h-4 bg-slate-700 border border-slate-500 rounded-sm z-10" />
+                <div className="w-9 min-[400px]:w-11 sm:w-13 h-3 sm:h-3.5 bg-slate-700 border border-slate-500 rounded-sm z-10" />
 
                 {/* Stacked Hex Nuts */}
                 {bolt.map((colorKey, nutIdx) => {
@@ -169,15 +174,15 @@ export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess })
                   return (
                     <div
                       key={nutIdx}
-                      className={`w-12 sm:w-15 h-9 sm:h-11 rounded-sm border-2 flex items-center justify-center font-bold text-xs text-white shadow-md z-20 transition-all duration-150 ${
-                        isLifted ? '-translate-y-7 ring-2 ring-yellow-300' : ''
+                      className={`w-8.5 min-[400px]:w-10 sm:w-12 md:w-14 h-7 sm:h-8.5 rounded-sm border-2 flex items-center justify-center font-bold text-xs text-white shadow-md z-20 transition-all duration-150 ${
+                        isLifted ? '-translate-y-6 ring-2 ring-yellow-300' : ''
                       }`}
                       style={{
                         backgroundColor: c.bg,
                         borderColor: c.border,
                       }}
                     >
-                      <div className="w-4 h-4 rounded-full bg-slate-900/60 border border-white/40" />
+                      <div className="w-3 h-3 sm:w-3.5 sm:h-3.5 rounded-full bg-slate-900/60 border border-white/40" />
                     </div>
                   );
                 })}
@@ -195,8 +200,8 @@ export const GameNutsAndBolts: React.FC<GameNutsAndBoltsProps> = ({ onSuccess })
 
         {won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in z-30">
-            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ NUTS SORTED! ★</span>
-            <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">All bolts categorized by pure color!</span>
+            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ ALL 5 COLORS SORTED! ★</span>
+            <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">All 5 colors sorted into pure rods!</span>
             <button
               onClick={() => onSuccessRef.current()}
               className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer shadow-lg"

@@ -1,15 +1,16 @@
 import React, { useEffect } from 'react';
-import { LeaderboardEntry, formatTime } from '../../utils/leaderboard';
+import { LeaderboardEntry, LeaderboardCategory, formatTime } from '../../utils/leaderboard';
 import { lookupJapaneseWord } from '../../data/dictionary';
 import { sounds } from '../../utils/audio';
 
 interface RunDetailsModalProps {
   entry: LeaderboardEntry;
   rank: number;
+  category?: LeaderboardCategory;
   onClose: () => void;
 }
 
-export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, onClose }) => {
+export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, category = 'time', onClose }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -27,16 +28,19 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, o
     : ['でぐち']; // Exit word at minimum
 
   const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : `#${rank}`;
+  const rankLabel = category === 'artifacts' ? '🏺 ARTIFACTS RANK' : '⚡ SPEED RANK';
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/90 backdrop-blur-xs p-4 select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-70 flex items-center justify-center bg-black/90 backdrop-blur-xs p-4 select-none animate-in fade-in duration-200">
       <div className="relative bg-[#17162b] border-4 border-yellow-400 pixel-box-gold p-6 max-w-md w-full shadow-2xl flex flex-col items-center gap-4">
         {/* Header */}
         <div className="flex justify-between items-center w-full pb-2 border-b-2 border-slate-700">
           <div className="flex items-center gap-2">
             <span className="text-xl">{medal}</span>
             <div className="text-left">
-              <span className="font-pixel text-[9px] text-yellow-300 block">RUN DETAILS</span>
+              <span className="font-pixel text-[9px] text-yellow-300 block">
+                {rankLabel} #{rank}
+              </span>
               <h3 className="font-pixel text-xs sm:text-sm text-white tracking-wider truncate max-w-[220px]">
                 {entry.runName}
               </h3>
@@ -54,22 +58,28 @@ export const RunDetailsModal: React.FC<RunDetailsModalProps> = ({ entry, rank, o
         </div>
 
         {/* Stats Grid */}
-        <div className="w-full grid grid-cols-3 gap-2 bg-slate-950/80 border border-slate-800 p-3 text-center">
+        <div className="w-full grid grid-cols-4 gap-1.5 bg-slate-950/80 border border-slate-800 p-2.5 text-center">
           <div>
             <span className="font-pixel text-[8px] text-slate-400 block">TIME</span>
-            <span className="font-mono text-sm text-yellow-300 font-bold">
+            <span className="font-mono text-xs sm:text-sm text-yellow-300 font-bold">
               {formatTime(entry.playtimeSeconds)}
             </span>
           </div>
           <div>
-            <span className="font-pixel text-[8px] text-slate-400 block">KANA FOUND</span>
-            <span className="font-mono text-sm text-cyan-300 font-bold">
+            <span className="font-pixel text-[8px] text-slate-400 block">ARTIFACTS</span>
+            <span className="font-mono text-xs sm:text-sm text-amber-300 font-bold">
+              🏺 {words.length}
+            </span>
+          </div>
+          <div>
+            <span className="font-pixel text-[8px] text-slate-400 block">KANA</span>
+            <span className="font-mono text-xs sm:text-sm text-cyan-300 font-bold">
               {entry.totalKana}
             </span>
           </div>
           <div>
             <span className="font-pixel text-[8px] text-slate-400 block">EXPLORER</span>
-            <span className="font-pixel text-xs text-emerald-400">
+            <span className="font-pixel text-[10px] sm:text-xs text-emerald-400 truncate block">
               {entry.characterName}
             </span>
           </div>

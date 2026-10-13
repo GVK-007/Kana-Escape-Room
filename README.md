@@ -215,6 +215,135 @@ kana-escape-room/
 
 ---
 
+## 📝 Changelog
+
+### 💡 Version 1.2.0 — Interactive Progressive Door Hint & Pronunciation System
+
+- **Concealed Japanese Word Spoilers**:
+  - Removed direct plaintext Japanese words (`かぎ`, `とびら`, `でぐち`) from door inscriptions, room lore descriptions, and inventory clue banners.
+  - Retained English meaning prompts (`"Key"`, `"Door"`, `"Exit"`) to encourage active vocabulary deduction.
+
+- **Sacred Cipher Hint Chamber (`DoorClueModal.tsx`)**:
+  - Added a dedicated 2-column Hint Panel layout on the right side of the exit door interface.
+  - **Stage 1 (Word Length)**: First hint reveals mystery boxes (`?`) matching the exact number of required Kana letters (e.g. 2 boxes for `かぎ`, 3 for `とびら` and `でぐち`).
+  - **Stage 2+ (Sequential Kana Unlocks)**: Subsequent hints progressively reveal one Kana letter at a time in sequence (`[ か 🔊 ] [ ? ]`).
+  - **Native Pronunciation on Demand**: Each revealed Kana tile is an interactive soundboard button (`🔊`) that plays its native voice pronunciation upon reveal and whenever clicked thereafter.
+  - **Live Cooldown Timer**: 20-second timer between consecutive hints with live real-time countdown display (`⏳ NEXT HINT IN 20s`), preventing accidental spam while remaining fast and engaging.
+  - **Persistent Cross-Session Tracking**: Hint progression and cooldown timestamps persist across room navigation and browser save states.
+  - **HUD Shortcut**: Added an interactive `💡 HINTS` badge to the top HUD bar, allowing players to view clues and hear pronunciations from anywhere in the chamber without needing to walk to the door.
+  - **Debug UI Cleanup**: Removed temporary debug door unlock buttons and chamber warp controls from the HUD and exit door modal for authentic escape room gameplay.
+
+### 🏹 Version 1.1.1 — Minigame Balance & Physics Fine-Tuning (Round 2 Corrections)
+
+- **Dots & Boxes (`GameDotsAndBoxes.tsx`)**:
+  - Expanded grid by another row and column from 4x4 dots to **5x5 dots** (**4x4 = 16 boxes** total).
+  - Updated majority victory condition to **9 boxes claimed** (`FIRST TO 9 WINS`).
+  - Adjusted dot spacing and line hitboxes for optimal tactical balance and touch/click ergonomics.
+
+- **Kana Spirit Catcher (`GameKanaCatcher.tsx`)**:
+  - Broadened spirit wisp spawn radius across the sacred pool (**20px – 215px**) to eliminate narrow clustering.
+  - Lengthened shrine basin catching platform to **54px** (widened from 44px).
+  - Smooth, steady movement speed tuned to **4.5 px/frame** for precise, deliberate positioning.
+  - Reinstated pure zero-miss reflex challenge (**1 Life / 0 Misses allowed**).
+
+- **Memory Matrix (`GamePatternMemory.tsx`)**:
+  - Added full keyboard and Numpad support: input pattern repeats instantly via keyboard number keys (`[1]`–`[9]`) or physical **Numpad** (`1`–`9`) with responsive glowing button animations and audio cues.
+  - Added `<kbd>Space</kbd>` or `<kbd>Enter</kbd>` keyboard shortcut to quickly retry from Stage 1 upon failure.
+
+- **Wall Breaker (`GameWallBreaker.tsx`)**:
+  - Decreased ball acceleration rate to a gentler **+1.5% compound increase** per brick hit.
+  - Added strict maximum ball speed cap at **1.45x**, keeping late-game volleys fast and tense while remaining controllable and playable.
+  - Added `<kbd>Space</kbd>` keyboard shortcut on the **BALL DROPPED!** failure screen to instantly retry and launch without needing a mouse click.
+
+- **Pagoda Slingshot (`GameAngryBirds.tsx`)**:
+  - **Instant Victory Bugfix**: Decoupled win evaluation from active projectile physics, ensuring structural collapses and falling roof lintels trigger immediate victory the exact moment the final crest is eliminated (no need to fire an extra shot).
+  - Rebalanced projectile ammo to **3 shots only** (`AMMO: 🔴🔴🔴`), requiring deliberate targeting and cascade collapses.
+  - Added input guards preventing slingshot pulls once ammo is exhausted while structural physics settles.
+
+### 🎯 Version 1.1.0 — Minigame Balance, Pagoda Physics & Gameplay Overhaul (Round 1 Corrections)
+
+- **Wall Breaker (`GameWallBreaker.tsx`)**:
+  - Fixed premature victory bug where stages cleared before breaking all bricks.
+  - Strict completion requirement now enforces destroying all 24 bricks.
+  - Added live HUD brick counter (`BRICKS LEFT: X/24`).
+
+- **Dots & Boxes (`GameDotsAndBoxes.tsx`)**:
+  - Rebalanced grid from grueling 10x10 dots (81 boxes) to a fast-paced 4x4 dot grid (3x3 = 9 boxes).
+  - Clear win condition: First player to capture 5 boxes secures majority victory.
+  - Significantly enlarged touch/click hitboxes and clear visual hover indicators.
+
+- **Nuts & Bolts Sort (`GameNutsAndBolts.tsx`)**:
+  - Upgraded puzzle complexity: increased capacity to 4 nuts per rod, with 4 distinct color sets across 6 rods.
+  - Solvable, deep initial shuffle requiring strategic multi-step planning and buffering.
+
+- **Match-3 Conduit (`GameMatch3.tsx`)**:
+  - Raised default target score from 150 to 500 points for rewarding combo gameplay.
+  - Added visual tile popping animation with particle bursts for matches.
+  - Added smooth slide-down dropping animation for incoming replacement tiles.
+
+- **Kana Spirit Catcher (`GameKanaCatcher.tsx`)**:
+  - Fixed late-game impossible speeds: capped maximum falling velocity to a reachable rate.
+  - Increased basket movement responsiveness (5.8 px/frame).
+  - Constrained spawn positions so new spirits never spawn impossibly far from the basket.
+  - Added a 3-life heart system (`LIVES: ❤️ ❤️ ❤️`) allowing up to 3 drops.
+
+- **Pagoda Slingshot (`GameAngryBirds.tsx`)**:
+  - Completely redesigned from plain static blocks into a multi-tier architectural pagoda fortress.
+  - Realistic structural collapse physics: foundation stone pillars, wooden lintels, upper roofs, and sheltered golden spirit orbs.
+  - Collapsing beams crush targets below; added 14-point curved trajectory prediction arc.
+
+- **Pong Core Duel (`GamePong.tsx`)**:
+  - Eliminated tedious stalemates: replaced telepathic AI tracking with humanized reaction times.
+  - Added paddle angle deflection: hitting with paddle edges cuts sharp slice angles to outmaneuver the AI.
+  - Brisk compounding rally acceleration resolves volleys within 4–6 hits.
+
+- **Japanese Kanji Passcodes (`GameTimedCode.tsx`)**:
+  - Replaced standard numerals with authentic Japanese kanji numbers (〇 through 九) and speech pronunciation.
+
+- **Sliding Tile Shelf (`GameSlidingPuzzle.tsx`)**:
+  - Rebalanced from a tedious 4x4 (15-puzzle) down to a quick, satisfying 3x3 (8-puzzle, numbers 1 to 8).
+  - Maintained 100% solvable random shuffling and smart Manhattan-distance hint calculator.
+
+### 🌸 Version 1.0.0 — Japanese Club Orientation & Mobile Overhaul
+
+#### ⛩️ Progressive Japanese Aesthetic & Environmental Design
+- **Chamber 1: The Cyber Akihabara Workshop (`秋葉原・電脳工房`)**:
+  - Retro computing & Dagashiya game den workshop with cedar parquet floors and cyber-brick walls with brass conduits.
+  - Traditional **Ichimatsu (市松模様)** checkerboard patterns, ambient cyber scanlines, and warm hanging paper **Chōchin (提灯)** lanterns.
+- **Chamber 2: The Grand Ryokan Archive (`古文書院・茶室`)**:
+  - Traditional Edo-era library and tea study with mossy stone walkways, Shoji paper screen walls (**障子**), and sliding Kumiko lattice doors with bronze recessed ring pulls.
+  - Handcrafted ceramic potted **Bonsai (盆栽)** trees, warm candle sconces, golden dust motes, and **Asanoha (麻の葉模様)** hemp-leaf lattice patterns with drifting green bamboo/tea leaves.
+- **Chamber 3: The Sacred Torii Sanctum (`神聖鳥居・月光の神域`)**:
+  - Moonlit shrine complex featuring hand-woven **Tatami (畳)** mats with authentic patterned fabric borders (*Tatami-beri*), vermillion lacquer shrine pillars over white plaster, and stone *Tōrō* lanterns.
+  - Majestic **Vermillion Torii Gate (鳥居)** adorned with braided **Shimenawa (注連縄)** sacred rope and zigzag white **Shide (紙垂)** paper pendants that unlock into a glowing golden celestial portal.
+  - **Sakura Fubuki (桜吹雪)** cherry blossom swirl with dynamic sine-wave wind physics, altar spirit embers (*Hitodama*), and **Seigaiha (青海波模様)** ocean wave motifs.
+- **Authentic Japanese Seal Stamps (判子 / Hanko)**:
+  - Custom red inkan seals stamped dynamically upon reward collection (`見事` / Splendid!) and chamber clears (`見事`, `合格` / Passed!, `皆伝` / Mastery!).
+
+#### 🔊 Audio & Pronunciation System
+- **Offline Voice Audio Library**: Pre-cached voice pronunciations for all Kana syllables, vocabulary words, and colors (`public/audio/`) with automatic fallback to browser SpeechSynthesis.
+- **Natural Speech Cadence**: Added deliberate acoustic pauses between syllables and words during word-crafting to eliminate rushed/overlapping audio.
+- **Audio Replay Controls**: Dedicated `🔊 Pronunciation` replay buttons in the Kana reward screen, Word Builder, and door clue modals.
+- **Reward Chime Fix**: Resolved auto-repeating voice audio during reward celebrations; pronunciation plays once and allows manual replay.
+
+#### 📱 Mobile & Responsive Display System
+- **Device Mode Switcher**: Added responsive layout engine supporting both **PC 16:9 Widescreen** and **Mobile 3:2** aspect ratios with live aspect-ratio toggling.
+- **Virtual Touch Controls**: Built-in 8-way on-screen D-Pad and responsive action buttons (`[E] ACTION / PLAY`, `🎒 BAG [I]`) with toggleable visibility for smartphones and tablets.
+- **Playfield Expansion**: Enlarged minigame viewports and responsive modal scaling, maximizing playable screen real estate on both desktop monitors and mobile devices.
+
+#### 🎮 Replayability & Educational Minigames
+- **In-Room Kana Letter Randomization**: Shuffles available reward Kana letters among the interactables within each room per run, ensuring high replayability while strictly preserving 100% solvability for door unlock words (`かぎ`, `とびら`, `でぐち`).
+- **Color Matching Wires Overhaul**: Rewrote the circuit box puzzle to teach Japanese colors by pairing English wire leads with Japanese color names (`あか`, `あお`, `みどり`, `きいろ`, `むらさき`), Kanji equivalents, and Romaji pronunciations.
+- **Universal Minigame Reset**: Added dedicated `[R] RESET` button to all minigame cabinets to quickly retry puzzles without backing out.
+
+#### 💾 Save Data Backup & Migration
+- **Save Transfer Modal**: Added JSON export and import modal accessible from the Title Screen for easy progress backup, restore, and transfer across devices.
+
+#### 🌐 Clean English UI Navigation
+- Preserved clean, intuitive English labels, buttons, headers, and HUD badges to ensure effortless navigation for club orientation participants while learning Japanese vocabulary.
+
+---
+
 ## Contributing
 
 Contributions, bug reports, and feature proposals are welcome:
@@ -223,8 +352,6 @@ Contributions, bug reports, and feature proposals are welcome:
 3. Commit your changes (`git commit -m 'Add new puzzle station'`).
 4. Push to the branch (`git push origin feature/improvement`).
 5. Open a Pull Request.
-
----
 
 ## License and Attribution
 

@@ -637,6 +637,13 @@ class SoundEngine {
   }
 
   private stopCurrentSpeech() {
+    if (typeof window !== 'undefined' && window.speechSynthesis) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // ignore
+      }
+    }
     if (this.currentSpeechAudio) {
       try {
         this.currentSpeechAudio.pause();
@@ -671,17 +678,38 @@ class SoundEngine {
     audio.volume = Math.max(0.1, Math.min(1.0, this.sfxVolume * 1.2));
     this.currentSpeechAudio = audio;
 
-    const playPromise = audio.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Direct full-word audio file not found:
-        // If word has multiple kana characters, play each syllable in sequence!
+    let fallbackTriggered = false;
+    const handleFallback = () => {
+      if (fallbackTriggered) return;
+      fallbackTriggered = true;
+
+      // 1. Try Web Speech API first for natural whole-word pronunciation
+      const spoken = this.fallbackSpeechSynthesis(clean, () => {
+        // If Speech Synthesis fails, sequence syllables
         const chars = Array.from(clean);
         if (chars.length > 1) {
           this.playSyllableSequence(chars);
         } else {
-          this.fallbackSpeechSynthesis(clean);
+          this.playKanaObtained();
         }
+      });
+
+      if (!spoken) {
+        const chars = Array.from(clean);
+        if (chars.length > 1) {
+          this.playSyllableSequence(chars);
+        }
+      }
+    };
+
+    audio.onerror = () => {
+      handleFallback();
+    };
+
+    const playPromise = audio.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(() => {
+        handleFallback();
       });
     }
   }
@@ -700,44 +728,55 @@ class SoundEngine {
             this.fallbackSpeechSynthesis(char);
           });
         }
-      }, idx * 300); // 300ms rhythmic cadence between morae
+      }, idx * 175); // 175ms natural mora cadence
       this.speechSequenceTimers.push(timer);
     });
   }
 
-  private fallbackSpeechSynthesis(text: string) {
-    if (typeof window === 'undefined') return;
-
-    if (window.speechSynthesis) {
-      try {
-        if (window.speechSynthesis.paused) {
-          window.speechSynthesis.resume();
-        }
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ja-JP';
-        utterance.rate = 0.85;
-        utterance.volume = this.sfxVolume;
-
-        const voices = window.speechSynthesis.getVoices();
-        const jaVoice = voices.find(
-          (v) => v.lang.toLowerCase().startsWith('ja') || v.lang.toLowerCase().includes('jp')
-        );
-        if (jaVoice) {
-          utterance.voice = jaVoice;
-        }
-
-        utterance.onerror = () => {
-          this.playKanaObtained();
-        };
-
-        window.speechSynthesis.speak(utterance);
-        return;
-      } catch {
-        // fallback to chime below
-      }
+  private fallbackSpeechSynthesis(text: string, onFail?: () => void): boolean {
+    if (typeof window === 'undefined' || !window.speechSynthesis) {
+      if (onFail) onFail();
+      return false;
     }
 
-    this.playKanaObtained();
+    try {
+      window.speechSynthesis.cancel();
+
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+
+      const voices = window.speechSynthesis.getVoices();
+      const jaVoice = voices.find(
+        (v) => v.lang.toLowerCase().startsWith('ja') || v.lang.toLowerCase().includes('jp')
+      );
+
+      // NEVER allow non-Japanese fallback voices (which announce "Chinese character" or speak English)
+      if (!jaVoice) {
+        if (onFail) onFail();
+        return false;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'ja-JP';
+      utterance.rate = 0.95;
+      utterance.volume = this.sfxVolume;
+
+      if (jaVoice) {
+        utterance.voice = jaVoice;
+      }
+
+      utterance.onerror = () => {
+        if (onFail) onFail();
+        else this.playKanaObtained();
+      };
+
+      window.speechSynthesis.speak(utterance);
+      return true;
+    } catch {
+      if (onFail) onFail();
+      return false;
+    }
   }
 }
 

@@ -17,6 +17,7 @@ import { RoomVictoryModal } from './components/ui/RoomVictoryModal';
 import { GameEndingModal } from './components/ui/GameEndingModal';
 import { MiniGameModal } from './components/minigames/MiniGameModal';
 import { InventoryModal } from './components/inventory/InventoryModal';
+import { TableDisplayModal } from './components/ui/TableDisplayModal';
 import { ScreenTransition } from './components/ui/ScreenTransition';
 import { sounds } from './utils/audio';
 import { useDeviceMode } from './utils/useDeviceMode';
@@ -39,6 +40,20 @@ export default function App() {
   const [unlockedDoors, setUnlockedDoors] = useState<string[]>([]);
   const [playtimeSeconds, setPlaytimeSeconds] = useState(0);
   const [volumeEnabled, setVolumeEnabled] = useState(true);
+  const [spawnDirection, setSpawnDirection] = useState<'forward' | 'backward'>('forward');
+  const [activeTableId, setActiveTableId] = useState<string | null>(null);
+  const [displayedItems, setDisplayedItems] = useState<Record<string, string[]>>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed: GameSaveState = JSON.parse(raw);
+        if (parsed.displayedItems) return parsed.displayedItems;
+      }
+    } catch {
+      // ignore
+    }
+    return {};
+  });
 
   // Active room minigame reward distribution per run
   const [shuffledRewards, setShuffledRewards] = useState<Record<string, KanaItem>>(() => {
@@ -54,6 +69,22 @@ export default function App() {
       // ignore
     }
     return generateShuffledRoomRewards(ROOMS);
+  });
+
+  // Active room cipher hint progression per room
+  const [roomHints, setRoomHints] = useState<Record<string, { revealedCount: number; lastHintTimestamp: number }>>(() => {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed: GameSaveState = JSON.parse(raw);
+        if (parsed.roomHints) {
+          return parsed.roomHints;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return {};
   });
 
   // Active interaction targets
@@ -97,6 +128,8 @@ export default function App() {
         playtimeSeconds,
         volumeEnabled,
         shuffledRewards,
+        roomHints,
+        displayedItems,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       setHasSaveData(true);
@@ -113,6 +146,8 @@ export default function App() {
     playtimeSeconds,
     volumeEnabled,
     shuffledRewards,
+    roomHints,
+    displayedItems,
   ]);
 
   // Autosave when room/inventory/unlocked status changes during play
@@ -120,7 +155,7 @@ export default function App() {
     if (gameState !== 'TITLE') {
       saveGame();
     }
-  }, [gameState, inventory, completedMinigames, unlockedDoors, shuffledRewards, saveGame]);
+  }, [gameState, inventory, completedMinigames, unlockedDoors, shuffledRewards, roomHints, displayedItems, saveGame]);
 
   // Playtime tick
   useEffect(() => {
@@ -198,6 +233,9 @@ export default function App() {
     setCompletedMinigames([]);
     setCraftedWords([]);
     setUnlockedDoors([]);
+    setDisplayedItems({});
+    setRoomHints({});
+    setSpawnDirection('forward');
     setPlaytimeSeconds(0);
     setTargetNextRoomIndex(0);
     setTransitionActive(true);
@@ -219,6 +257,8 @@ export default function App() {
         setCompletedMinigames(data.completedMinigames || []);
         setCraftedWords(data.craftedWords || []);
         setUnlockedDoors(data.unlockedDoors || []);
+        setDisplayedItems(data.displayedItems || {});
+        setSpawnDirection('forward');
         setPlaytimeSeconds(data.playtimeSeconds || 0);
         setVolumeEnabled(data.volumeEnabled ?? true);
         sounds.setEnabled(data.volumeEnabled ?? true);
@@ -243,6 +283,8 @@ export default function App() {
   const handleResetSave = () => {
     localStorage.removeItem(STORAGE_KEY);
     setHasSaveData(false);
+    setDisplayedItems({});
+    setRoomHints({});
     setShuffledRewards(generateShuffledRoomRewards(ROOMS));
     sounds.playFail();
   };
@@ -257,6 +299,8 @@ export default function App() {
     setCompletedMinigames(data.completedMinigames || []);
     setCraftedWords(data.craftedWords || []);
     setUnlockedDoors(data.unlockedDoors || []);
+    setDisplayedItems(data.displayedItems || {});
+    setSpawnDirection('forward');
     setPlaytimeSeconds(data.playtimeSeconds || 0);
     setVolumeEnabled(data.volumeEnabled ?? true);
     sounds.setEnabled(data.volumeEnabled ?? true);
@@ -275,6 +319,21 @@ export default function App() {
   const isDoorUnlocked = unlockedDoors.includes(currentRoom.id);
 
   // Interaction handlers
+  const handleOpenInventory = useCallback(() => {
+    sounds.playSelect();
+    setGameState('INVENTORY');
+  }, []);
+
+  const handleOpenPauseMenu = useCallback(() => {
+    sounds.playSelect();
+    setGameState('PAUSED');
+  }, []);
+
+  const handleOpenDoorClue = useCallback(() => {
+    sounds.playSelect();
+    setGameState('DOOR_CLUE');
+  }, []);
+
   const handleInteract = useCallback((obj: InteractableObject) => {
     setActiveInteractable(obj);
     setGameState('MINIGAME');
@@ -310,6 +369,12 @@ export default function App() {
   }, []);
 
   const handleInteractDoor = () => {
+    // If the exit door is already unlocked, pass directly through without re-prompting!
+    if (isDoorUnlocked) {
+      sounds.playDoorUnlock();
+      handleOpenDoor();
+      return;
+    }
     setGameState('DOOR_CLUE');
     sounds.playSelect();
   };
@@ -330,10 +395,44 @@ export default function App() {
   };
 
   const handleProceedNextRoom = () => {
+    setSpawnDirection('forward');
     const nextIdx = Math.min(ROOMS.length - 1, currentRoomIndex + 1);
     setTargetNextRoomIndex(nextIdx);
     setTransitionActive(true);
     setGameState('PLAYING');
+  };
+
+  const handleProceedPrevRoom = () => {
+    if (currentRoomIndex <= 0) return;
+    sounds.playDoorUnlock();
+    setSpawnDirection('backward');
+    const prevIdx = currentRoomIndex - 1;
+    setTargetNextRoomIndex(prevIdx);
+    setTransitionActive(true);
+    setGameState('PLAYING');
+  };
+
+  const handleInteractTable = (tableId: string) => {
+    setActiveTableId(tableId);
+    sounds.playSelect();
+  };
+
+  const handlePlaceTableItem = (word: string, slotIndex: number) => {
+    if (!activeTableId) return;
+    setDisplayedItems((prev) => {
+      const existing = prev[activeTableId] ? [...prev[activeTableId]] : [];
+      existing[slotIndex] = word;
+      return { ...prev, [activeTableId]: existing };
+    });
+  };
+
+  const handleRemoveTableItem = (slotIndex: number) => {
+    if (!activeTableId) return;
+    setDisplayedItems((prev) => {
+      const existing = prev[activeTableId] ? [...prev[activeTableId]] : [];
+      existing[slotIndex] = '';
+      return { ...prev, [activeTableId]: existing.filter(Boolean) };
+    });
   };
 
   const handleTransitionMidpoint = () => {
@@ -377,8 +476,10 @@ export default function App() {
     sounds.playKanaObtained();
   };
 
+  const isPortraitEmulator = device.orientation === 'portrait';
+
   return (
-    <main className="w-screen h-screen bg-[#0e0d1a] flex flex-col items-center justify-center relative overflow-hidden select-none">
+    <main className={`w-screen ${isPortraitEmulator ? 'h-[100dvh]' : 'h-screen'} bg-[#0e0d1a] flex flex-col items-center justify-center relative overflow-hidden select-none`}>
       {gameState === 'TITLE' ? (
         <TitleScreen
           hasSaveData={hasSaveData}
@@ -393,54 +494,59 @@ export default function App() {
         />
       ) : (
         <div
-          className={`w-full h-full flex flex-col items-center justify-between p-1.5 sm:p-3 transition-all ${
-            device.isDesktop ? 'max-w-7xl 2xl:max-w-[1536px]' : 'max-w-2xl sm:max-w-4xl'
+          className={`w-full h-full flex flex-col items-center justify-between p-1 sm:p-2 transition-all ${
+            isPortraitEmulator
+              ? 'max-w-2xl'
+              : device.isDesktop
+              ? 'max-w-7xl 2xl:max-w-[1536px]'
+              : 'w-full max-w-5xl 2xl:max-w-7xl'
           }`}
         >
           {/* Top Bar / HUD */}
           <HUD
             currentRoom={currentRoom}
-            currentRoomIndex={currentRoomIndex}
             inventory={inventory}
             isDoorUnlocked={isDoorUnlocked}
-            onOpenInventory={() => {
-              sounds.playSelect();
-              setGameState('INVENTORY');
-            }}
-            onOpenPauseMenu={() => {
-              sounds.playSelect();
-              setGameState('PAUSED');
-            }}
-            onUnlockDoor={handleUnlockDoor}
-            onSelectRoomIndex={(idx) => {
-              if (idx >= 0 && idx < ROOMS.length) {
-                setCurrentRoomIndex(idx);
-              }
-            }}
+            onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
+            onOpenInventory={handleOpenInventory}
+            onOpenPauseMenu={handleOpenPauseMenu}
+            onOpenDoorClue={handleOpenDoorClue}
           />
 
           {/* Main 2D Pixel-Art Game Viewport */}
-          <div className="flex-1 w-full flex items-center justify-center my-auto">
+          <div className={`flex-1 w-full flex flex-col items-center ${isPortraitEmulator ? 'h-full justify-between' : 'justify-center my-auto'} overflow-hidden min-h-0`}>
             <GameViewport
               room={currentRoom}
               characterId={selectedCharacter}
               isDoorUnlocked={isDoorUnlocked}
               completedMinigames={completedMinigames}
-              isLocked={gameState !== 'PLAYING'}
+              isLocked={gameState !== 'PLAYING' || activeTableId !== null}
+              isFrozen={gameState !== 'PLAYING' || activeTableId !== null}
               onInteract={handleInteract}
               onInteractDoor={handleInteractDoor}
-              onOpenInventory={() => setGameState('INVENTORY')}
-              onOpenPauseMenu={() => setGameState('PAUSED')}
+              onReturnToPrevRoom={currentRoomIndex > 0 ? handleProceedPrevRoom : undefined}
+              onOpenInventory={handleOpenInventory}
+              onOpenPauseMenu={handleOpenPauseMenu}
               onDebugGiveKana={handleDebugGiveKana}
               onDebugUnlockDoor={handleDebugUnlockDoor}
+              displayedItems={displayedItems}
+              onInteractTable={handleInteractTable}
+              spawnDirection={spawnDirection}
             />
           </div>
-
-          {/* Bottom helper info */}
-          <div className="w-full text-center text-[10px] font-pixel text-slate-500 py-1 hidden sm:block">
-            Kana Escape Room • Craft Japanese words to unlock exit seals
-          </div>
         </div>
+      )}
+
+      {/* Exhibit Display Table Modal */}
+      {activeTableId && (
+        <TableDisplayModal
+          tableId={activeTableId}
+          currentItems={displayedItems[activeTableId] || []}
+          craftedWords={Array.from(new Set([...craftedWords, currentRoom.targetWord]))}
+          onPlaceItem={handlePlaceTableItem}
+          onRemoveItem={handleRemoveTableItem}
+          onClose={() => setActiveTableId(null)}
+        />
       )}
 
       {/* MODALS */}
@@ -464,6 +570,7 @@ export default function App() {
           inventory={inventory}
           currentRoom={currentRoom}
           craftedWords={craftedWords}
+          characterId={selectedCharacter}
           isDoorUnlocked={isDoorUnlocked}
           onUnlockDoor={handleUnlockDoor}
           onWordCrafted={handleWordCrafted}
@@ -475,8 +582,17 @@ export default function App() {
         <DoorClueModal
           door={currentRoom.exitDoor}
           isUnlocked={isDoorUnlocked}
+          roomHint={roomHints[currentRoom.id] || { revealedCount: 0, lastHintTimestamp: 0 }}
+          onRevealHint={(newCount) => {
+            setRoomHints((prev) => ({
+              ...prev,
+              [currentRoom.id]: {
+                revealedCount: newCount,
+                lastHintTimestamp: Date.now(),
+              },
+            }));
+          }}
           onOpenDoor={handleOpenDoor}
-          onUnlockDoor={handleUnlockDoor}
           onClose={() => setGameState('PLAYING')}
         />
       )}

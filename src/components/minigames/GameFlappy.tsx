@@ -35,7 +35,13 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
     won: false,
   });
 
+  const lastJumpTimeRef = useRef<number>(0);
+
   const jump = () => {
+    const now = Date.now();
+    if (now - lastJumpTimeRef.current < 160) return;
+    lastJumpTimeRef.current = now;
+
     const s = stateRef.current;
     if (s.won) return;
 
@@ -82,17 +88,20 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
     ctx.imageSmoothingEnabled = false;
 
     let animId: number;
+    let lastTime = performance.now();
+    let accumulator = 0;
+    const STEP_MS = 1000 / 60;
     const gravity = 0.22;
     const gap = 68;
     const pipeWidth = 24;
 
-    const loop = () => {
+    const updatePhysics = (dt: number = 1.0) => {
       const state = stateRef.current;
 
       // Update physics if active
       if (state.started && !state.gameOver && !state.won) {
-        state.velocity += gravity;
-        state.birdY += state.velocity;
+        state.velocity += gravity * dt;
+        state.birdY += state.velocity * dt;
 
         // Ground collision (y > 184)
         if (state.birdY > 184) {
@@ -110,7 +119,7 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
         // Update Pipes
         for (let i = 0; i < state.pipes.length; i++) {
           const p = state.pipes[i];
-          p.x -= 1.5;
+          p.x -= 1.5 * dt;
 
           // Check pass
           if (!p.passed && p.x + pipeWidth < 45) {
@@ -154,6 +163,24 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
           }
         }
       }
+    };
+
+    const loop = (currentTime?: number) => {
+      const now = currentTime || performance.now();
+      let deltaMs = now - lastTime;
+      lastTime = now;
+      if (deltaMs > 100) deltaMs = 100;
+      if (deltaMs < 0) deltaMs = 0;
+
+      accumulator += deltaMs;
+      let steps = 0;
+      while (accumulator >= STEP_MS && steps < 4) {
+        updatePhysics(1.0);
+        accumulator -= STEP_MS;
+        steps++;
+      }
+
+      const state = stateRef.current;
 
       // Render
       ctx.fillStyle = '#0a0918'; // Deep night sky
@@ -233,15 +260,14 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
   }, []);
 
   return (
-    <div className="flex flex-col items-center select-none font-pixel w-full max-w-[580px]">
-      <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm px-1">
+    <div className="flex flex-col items-center select-none font-pixel w-full max-w-[620px] md:max-w-[700px] lg:max-w-[760px]">
+      <div className="flex justify-between items-center w-full mb-1.5 sm:mb-2 text-xs sm:text-sm md:text-base px-1">
         <span className="text-amber-300 font-bold">GATES: {score}/{targetScore}</span>
-        <span className="text-emerald-400 text-xs font-mono">SPACE / CLICK TO LIFT</span>
+        <span className="text-emerald-400 text-[10px] sm:text-xs md:text-sm font-mono">SPACE / CLICK TO LIFT</span>
       </div>
 
       <div
-        onClick={jump}
-        onTouchStart={(e) => {
+        onPointerDown={(e) => {
           e.preventDefault();
           jump();
         }}
@@ -251,25 +277,25 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
           ref={canvasRef}
           width={260}
           height={200}
-          className="pixelated block w-full max-w-[560px] aspect-[260/200] object-contain"
+          className="pixelated block w-full max-w-[600px] md:max-w-[680px] lg:max-w-[740px] aspect-[260/200] max-h-[55vh] sm:max-h-[480px] md:max-h-[540px] object-contain"
         />
 
         {!started && !gameOver && !won && (
-          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-4 text-center pointer-events-none">
-            <span className="text-amber-400 text-sm sm:text-base mb-2 animate-pulse font-bold">CLICK OR [SPACE] TO LIFT</span>
-            <span className="text-xs text-slate-300 leading-relaxed max-w-xs">
+          <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center p-3 text-center pointer-events-none">
+            <span className="text-amber-400 text-xs sm:text-sm md:text-base mb-1 animate-pulse font-bold">CLICK OR [SPACE] TO LIFT</span>
+            <span className="text-[10px] sm:text-xs md:text-sm text-slate-300 leading-relaxed max-w-sm">
               Steer drone through {targetScore} security gates!
             </span>
           </div>
         )}
 
         {won && (
-          <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in duration-200">
-            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ COURSE CLEARED! ★</span>
-            <span className="text-xs text-slate-300 mb-4">Passed {score} gates!</span>
+          <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-3 sm:p-5 animate-in fade-in duration-200">
+            <span className="text-emerald-400 text-sm sm:text-base md:text-xl mb-1.5 font-bold">★ COURSE CLEARED! ★</span>
+            <span className="text-xs sm:text-sm md:text-base text-slate-300 mb-3 sm:mb-4">Passed {score} gates!</span>
             <button
               onClick={() => onSuccessRef.current()}
-              className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-lg"
+              className="px-5 sm:px-7 py-2 sm:py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm md:text-base font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-lg"
             >
               CLAIM REWARD NOW
             </button>
@@ -277,14 +303,14 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
         )}
 
         {gameOver && !won && (
-          <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-red-500 p-4">
-            <span className="text-red-400 text-sm sm:text-base mb-3 font-bold">DRONE CRASHED</span>
+          <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-red-500 p-3 sm:p-5">
+            <span className="text-red-400 text-xs sm:text-sm md:text-lg mb-2 sm:mb-3 font-bold">DRONE CRASHED</span>
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 restart();
               }}
-              className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white text-xs border-2 border-white cursor-pointer active:translate-y-0.5"
+              className="px-5 sm:px-6 py-2 sm:py-2.5 bg-red-600 hover:bg-red-500 text-white text-xs sm:text-sm md:text-base border-2 border-white cursor-pointer active:translate-y-0.5 shadow-lg"
             >
               RESTART
             </button>
@@ -293,12 +319,15 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
       </div>
 
       <button
-        onClick={jump}
-        className="mt-3 px-8 py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs sm:text-sm border-2 border-yellow-200 cursor-pointer active:translate-y-0.5 shadow-md w-full max-w-[320px] text-center"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          jump();
+        }}
+        className="mt-2.5 px-6 py-2 sm:py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs sm:text-sm md:text-base border-2 border-yellow-200 cursor-pointer active:translate-y-0.5 shadow-md w-full max-w-[320px] text-center"
       >
         LIFT DRONE [SPACE]
       </button>
-      <p className="text-[10px] sm:text-xs text-slate-400 mt-2">Space, Up Arrow, or Click to Hover</p>
+      <p className="text-[9px] sm:text-[10px] md:text-xs text-slate-400 mt-1">Space, Up Arrow, or Tap to Hover</p>
     </div>
   );
 };

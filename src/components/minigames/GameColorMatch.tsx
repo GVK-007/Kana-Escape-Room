@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { sounds } from '../../utils/audio';
 
 interface GameColorMatchProps {
@@ -74,14 +74,20 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
   const [leftNodes, setLeftNodes] = useState<ColorNode[]>([]);
   const [rightNodes, setRightNodes] = useState<ColorNode[]>([]);
   const [connections, setConnections] = useState<Record<string, string>>({}); // leftId -> rightId
-  const [draggingLeftId, setDraggingLeftId] = useState<string | null>(null);
-  const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
+  const [hoveredRightId, setHoveredRightId] = useState<string | null>(null);
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
   const [won, setWon] = useState(false);
 
-  // Reference to the exact board container holding both the SVG and the pins
+  // References to the board and all pin/row elements
   const boardRef = useRef<HTMLDivElement | null>(null);
   const leftPinRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const rightPinRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const rightRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // Prevent ghost mouse clicks after touch events on mobile
+  const lastTouchTimeRef = useRef<number>(0);
+  const isDraggingRef = useRef<boolean>(false);
 
   useEffect(() => {
     const l = [...COLOR_SET];
@@ -89,128 +95,210 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
     setLeftNodes(l);
     setRightNodes(r);
     setConnections({});
+    setActiveLeftId(null);
+    setDragPos(null);
   }, []);
 
-  const getPinCoords = (element: HTMLElement | null) => {
+  // Convert element or client coordinates into exact internal SVG coordinates inside boardRef
+  const getPinCoords = useCallback((element: HTMLElement | null) => {
     if (!element || !boardRef.current) return { x: 0, y: 0 };
     const bRect = boardRef.current.getBoundingClientRect();
     const eRect = element.getBoundingClientRect();
+    const scaleX = (boardRef.current.offsetWidth || 1) / (bRect.width || 1);
+    const scaleY = (boardRef.current.offsetHeight || 1) / (bRect.height || 1);
     return {
-      x: eRect.left - bRect.left + eRect.width / 2,
-      y: eRect.top - bRect.top + eRect.height / 2,
+      x: (eRect.left - bRect.left + eRect.width / 2) * scaleX,
+      y: (eRect.top - bRect.top + eRect.height / 2) * scaleY,
     };
-  };
+  }, []);
 
-  const updateMouse = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!boardRef.current) return;
+  const getInternalCoords = useCallback((clientX: number, clientY: number) => {
+    if (!boardRef.current) return { x: 0, y: 0 };
     const bRect = boardRef.current.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    setMousePos({
-      x: clientX - bRect.left,
-      y: clientY - bRect.top,
-    });
-  };
+    const scaleX = (boardRef.current.offsetWidth || 1) / (bRect.width || 1);
+    const scaleY = (boardRef.current.offsetHeight || 1) / (bRect.height || 1);
+    return {
+      x: (clientX - bRect.left) * scaleX,
+      y: (clientY - bRect.top) * scaleY,
+    };
+  }, []);
 
-  const handleLeftPinClick = (id: string) => {
-    if (won) return;
-    if (draggingLeftId === id) {
-      setDraggingLeftId(null);
-      setMousePos(null);
-    } else {
-      sounds.playSelect();
-      setDraggingLeftId(id);
-      const el = leftPinRefs.current[id];
-      const coords = getPinCoords(el);
-      setMousePos(coords);
-    }
-  };
+  // Find the target right node under or closest to pointer (generous mobile hit area)
+  const findTargetRightNode = useCallback(
+    (clientX: number, clientY: number): string | null => {
+      if (!boardRef.current) return null;
+      const bRect = boardRef.current.getBoundingClientRect();
+      // Target must be in the right 60% of the board
+      if (clientX < bRect.left + bRect.width * 0.35) return null;
 
-  const handleStartDrag = (id: string, e: React.MouseEvent | React.TouchEvent) => {
-    if (won) return;
-    sounds.playSelect();
-    setDraggingLeftId(id);
-    updateMouse(e);
-  };
+      let bestId: string | null = null;
+      let bestDist = Infinity;
 
-  const handleDropOnRight = (rightId: string) => {
-    if (!draggingLeftId || won) return;
-
-    const targetNode = COLOR_SET.find((c) => c.id === rightId);
-    if (targetNode) {
-      sounds.speakJapanese(targetNode.kana);
-    } else {
-      sounds.playKanaObtained();
-    }
-
-    const nextConn = { ...connections, [draggingLeftId]: rightId };
-    setConnections(nextConn);
-    setDraggingLeftId(null);
-    setMousePos(null);
-
-    // Verify all correct
-    if (Object.keys(nextConn).length === COLOR_SET.length) {
-      const allMatched = Object.entries(nextConn).every(([l, r]) => l === r);
-      if (allMatched) {
-        setWon(true);
-        sounds.playSuccess();
-        setTimeout(() => onSuccess(), 1200);
-      } else {
-        sounds.playFail();
-      }
-    }
-  };
-
-  const handleBoardTouchEnd = (e: React.TouchEvent) => {
-    if (!draggingLeftId) return;
-    const touch = e.changedTouches[0];
-    if (touch) {
-      // Find which right pin (if any) the finger was released over
-      for (const [rId, el] of Object.entries(rightPinRefs.current)) {
-        if (el) {
-          const rect = el.getBoundingClientRect();
-          if (
-            touch.clientX >= rect.left - 10 &&
-            touch.clientX <= rect.right + 10 &&
-            touch.clientY >= rect.top - 10 &&
-            touch.clientY <= rect.bottom + 10
-          ) {
-            handleDropOnRight(rId);
-            return;
+      for (const node of rightNodes) {
+        const el = rightRowRefs.current[node.id];
+        if (!el) continue;
+        const rRect = el.getBoundingClientRect();
+        // Generous vertical tolerance (±30px)
+        if (clientY >= rRect.top - 30 && clientY <= rRect.bottom + 30) {
+          const dist = Math.abs(clientY - (rRect.top + rRect.height / 2));
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestId = node.id;
           }
         }
       }
-    }
-    // If not released over a right pin, keep selection for tap-to-connect!
-  };
+      return bestId;
+    },
+    [rightNodes]
+  );
 
-  const handleGlobalUp = () => {
-    // Keep draggingLeftId if selected via tap, so user can tap right pin
-  };
+  const connectPins = useCallback(
+    (leftId: string, rightId: string) => {
+      if (won) return;
+
+      const targetNode = COLOR_SET.find((c) => c.id === rightId);
+      if (targetNode) {
+        sounds.speakJapanese(targetNode.kana);
+      } else {
+        sounds.playKanaObtained();
+      }
+
+      setConnections((prev) => {
+        const next = { ...prev, [leftId]: rightId };
+
+        // Verify if all 5 colors are correctly connected
+        if (Object.keys(next).length === COLOR_SET.length) {
+          const allMatched = Object.entries(next).every(([l, r]) => l === r);
+          if (allMatched) {
+            setWon(true);
+            sounds.playSuccess();
+            setTimeout(() => onSuccess(), 1200);
+          } else {
+            sounds.playFail();
+          }
+        }
+        return next;
+      });
+
+      setActiveLeftId(null);
+      setDragPos(null);
+      setHoveredRightId(null);
+      isDraggingRef.current = false;
+    },
+    [won, onSuccess]
+  );
 
   const removeConnection = (leftId: string) => {
     if (won) return;
     sounds.playBlip(320);
-    const next = { ...connections };
-    delete next[leftId];
-    setConnections(next);
+    setConnections((prev) => {
+      const next = { ...prev };
+      delete next[leftId];
+      return next;
+    });
+    setActiveLeftId(null);
+    setDragPos(null);
+  };
+
+  // User starts interacting with a Left Pin (click or touch)
+  const handleLeftPinStart = (leftId: string, clientX?: number, clientY?: number) => {
+    if (won) return;
+
+    // If already connected, tapping it disconnects it
+    if (connections[leftId]) {
+      removeConnection(leftId);
+      return;
+    }
+
+    // If currently active and tapped again, deselect
+    if (activeLeftId === leftId && !isDraggingRef.current) {
+      setActiveLeftId(null);
+      setDragPos(null);
+      return;
+    }
+
+    sounds.playSelect();
+    setActiveLeftId(leftId);
+    isDraggingRef.current = true;
+
+    if (clientX !== undefined && clientY !== undefined) {
+      setDragPos(getInternalCoords(clientX, clientY));
+    } else {
+      const el = leftPinRefs.current[leftId];
+      setDragPos(getPinCoords(el));
+    }
+  };
+
+  // User drags pointer across board
+  const handlePointerMove = (clientX: number, clientY: number) => {
+    if (!activeLeftId || !isDraggingRef.current) return;
+    setDragPos(getInternalCoords(clientX, clientY));
+    const target = findTargetRightNode(clientX, clientY);
+    setHoveredRightId(target);
+  };
+
+  // User releases pointer
+  const handlePointerUp = (clientX?: number, clientY?: number) => {
+    if (!activeLeftId) return;
+
+    if (clientX !== undefined && clientY !== undefined && isDraggingRef.current) {
+      const target = findTargetRightNode(clientX, clientY);
+      if (target) {
+        connectPins(activeLeftId, target);
+        return;
+      }
+    }
+
+    // If released on empty space, keep selected for tap-to-connect!
+    isDraggingRef.current = false;
+    setHoveredRightId(null);
+    // Move drag line end to pin center so it sits waiting
+    const el = leftPinRefs.current[activeLeftId];
+    setDragPos(getPinCoords(el));
+  };
+
+  // User taps a Right Pin or its row
+  const handleRightRowClick = (rightId: string) => {
+    if (won) return;
+
+    if (activeLeftId) {
+      connectPins(activeLeftId, rightId);
+    } else {
+      const targetNode = COLOR_SET.find((c) => c.id === rightId);
+      if (targetNode) {
+        sounds.speakJapanese(targetNode.kana);
+      }
+    }
   };
 
   return (
     <div className="flex flex-col items-center select-none font-pixel w-full max-w-[580px]">
-      <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm">
+      <div className="flex justify-between items-center w-full mb-1 sm:mb-2 text-xs sm:text-sm px-1">
         <span className="text-amber-400 font-bold">ENGLISH ➔ 日本語 COLORS</span>
-        <span className="text-cyan-400 text-[10px] sm:text-xs">CONNECT WIRES TO LEARN</span>
+        <span className="text-cyan-400 text-[10px] sm:text-xs">
+          {activeLeftId ? 'TAP MATCHING JAPANESE PIN' : 'TAP OR DRAG WIRES'}
+        </span>
       </div>
 
       {/* Board container: Exact parent of SVG and pins */}
       <div
         ref={boardRef}
-        onMouseMove={(e) => draggingLeftId && updateMouse(e)}
-        onTouchMove={(e) => draggingLeftId && updateMouse(e)}
-        onMouseUp={handleGlobalUp}
-        onTouchEnd={handleBoardTouchEnd}
-        className="relative bg-slate-950 p-4 sm:p-7 border-4 border-slate-700 shadow-2xl w-full h-[370px] sm:h-[410px] flex justify-between items-center overflow-hidden touch-none"
+        onMouseMove={(e) => isDraggingRef.current && handlePointerMove(e.clientX, e.clientY)}
+        onMouseUp={(e) => handlePointerUp(e.clientX, e.clientY)}
+        onTouchMove={(e) => {
+          if (isDraggingRef.current && e.touches[0]) {
+            handlePointerMove(e.touches[0].clientX, e.touches[0].clientY);
+          }
+        }}
+        onTouchEnd={(e) => {
+          lastTouchTimeRef.current = Date.now();
+          if (e.changedTouches[0]) {
+            handlePointerUp(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+          } else {
+            handlePointerUp();
+          }
+        }}
+        className="relative bg-slate-950 p-2 sm:p-4 border-4 border-slate-700 shadow-2xl w-full h-[230px] xs:h-[260px] sm:h-[320px] md:h-[360px] flex justify-between items-center overflow-hidden touch-none"
       >
         {/* SVG Flexible Wires Layer: Exact coordinate match */}
         <svg className="absolute inset-0 w-full h-full pointer-events-none z-10">
@@ -230,7 +318,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                 {/* Outer shadow / cable jacket */}
                 <path
                   d={`M ${start.x} ${start.y} C ${cX1} ${start.y}, ${cX2} ${end.y}, ${end.x} ${end.y}`}
-                  stroke="rgba(0,0,0,0.7)"
+                  stroke="rgba(0,0,0,0.75)"
                   strokeWidth="8"
                   fill="none"
                 />
@@ -249,25 +337,25 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
             );
           })}
 
-          {/* Currently Dragged Live Wire */}
-          {draggingLeftId && mousePos && (
+          {/* Currently Dragged or Active Live Wire */}
+          {activeLeftId && dragPos && (
             (() => {
-              const leftEl = leftPinRefs.current[draggingLeftId];
+              const leftEl = leftPinRefs.current[activeLeftId];
               const start = getPinCoords(leftEl);
-              const color = COLOR_SET.find((c) => c.id === draggingLeftId)?.color || '#facc15';
-              const cX1 = start.x + (mousePos.x - start.x) * 0.45;
-              const cX2 = start.x + (mousePos.x - start.x) * 0.55;
+              const color = COLOR_SET.find((c) => c.id === activeLeftId)?.color || '#facc15';
+              const cX1 = start.x + (dragPos.x - start.x) * 0.45;
+              const cX2 = start.x + (dragPos.x - start.x) * 0.55;
 
               return (
                 <g>
                   <path
-                    d={`M ${start.x} ${start.y} C ${cX1} ${start.y}, ${cX2} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`}
+                    d={`M ${start.x} ${start.y} C ${cX1} ${start.y}, ${cX2} ${dragPos.y}, ${dragPos.x} ${dragPos.y}`}
                     stroke="rgba(0,0,0,0.6)"
                     strokeWidth="8"
                     fill="none"
                   />
                   <path
-                    d={`M ${start.x} ${start.y} C ${cX1} ${start.y}, ${cX2} ${mousePos.y}, ${mousePos.x} ${mousePos.y}`}
+                    d={`M ${start.x} ${start.y} C ${cX1} ${start.y}, ${cX2} ${dragPos.y}, ${dragPos.x} ${dragPos.y}`}
                     stroke={color}
                     strokeWidth="5"
                     fill="none"
@@ -275,7 +363,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                     strokeDasharray="6 3"
                   />
                   <circle cx={start.x} cy={start.y} r="5" fill="#ffffff" />
-                  <circle cx={mousePos.x} cy={mousePos.y} r="6" fill={color} stroke="#ffffff" strokeWidth="2" />
+                  <circle cx={dragPos.x} cy={dragPos.y} r="6" fill={color} stroke="#ffffff" strokeWidth="2" />
                 </g>
               );
             })()
@@ -283,30 +371,52 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         </svg>
 
         {/* Left Input Terminals (English) */}
-        <div className="flex flex-col gap-4 sm:gap-5 z-20">
+        <div className="flex flex-col justify-around h-full z-20 py-1">
           {leftNodes.map((node) => {
             const isConnected = !!connections[node.id];
-            const isSelected = draggingLeftId === node.id;
+            const isSelected = activeLeftId === node.id;
             return (
-              <div key={node.id} className="flex items-center gap-2 sm:gap-2.5">
+              <div
+                key={node.id}
+                onClick={() => {
+                  if (Date.now() - lastTouchTimeRef.current < 450) return;
+                  handleLeftPinStart(node.id);
+                }}
+                onTouchStart={(e) => {
+                  if (e.touches[0]) {
+                    handleLeftPinStart(node.id, e.touches[0].clientX, e.touches[0].clientY);
+                  } else {
+                    handleLeftPinStart(node.id);
+                  }
+                }}
+                onMouseDown={(e) => {
+                  handleLeftPinStart(node.id, e.clientX, e.clientY);
+                }}
+                className="flex items-center gap-1 sm:gap-2.5 cursor-pointer py-0.5 group active:scale-95 transition-transform"
+              >
                 <div
-                  ref={(el) => { leftPinRefs.current[node.id] = el; }}
-                  onMouseDown={(e) => handleStartDrag(node.id, e)}
-                  onTouchStart={(e) => handleStartDrag(node.id, e)}
-                  onClick={() => isConnected ? removeConnection(node.id) : handleLeftPinClick(node.id)}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center font-bold cursor-pointer transition-transform ${
+                  ref={(el) => {
+                    leftPinRefs.current[node.id] = el;
+                  }}
+                  className={`w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center font-bold transition-all shadow-md ${
                     isSelected
-                      ? 'ring-4 ring-yellow-300 scale-110 shadow-xl'
+                      ? 'ring-4 ring-yellow-300 scale-110 shadow-yellow-500/50'
                       : isConnected
-                      ? 'ring-2 ring-yellow-400/80 scale-95'
-                      : 'hover:scale-110 shadow-lg'
+                      ? 'ring-2 ring-emerald-400/80 opacity-90'
+                      : 'group-hover:scale-105'
                   }`}
                   style={{ backgroundColor: node.color, borderColor: node.borderColor }}
                   title={`${node.english} (${node.symbol})`}
                 >
-                  <span className="text-black font-extrabold text-xs sm:text-sm">{node.symbol}</span>
+                  <span className="text-black font-extrabold text-[10px] sm:text-xs md:text-sm">
+                    {node.symbol}
+                  </span>
                 </div>
-                <span className="text-xs sm:text-sm text-slate-200 font-mono tracking-wider font-bold">
+                <span
+                  className={`text-[9px] xs:text-[10px] sm:text-xs md:text-sm font-mono tracking-wider font-bold transition-colors ${
+                    isSelected ? 'text-yellow-300' : 'text-slate-200 group-hover:text-white'
+                  }`}
+                >
                   {node.english}
                 </span>
               </div>
@@ -315,49 +425,69 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         </div>
 
         {/* Right Output Terminals (Japanese Vocabulary + Pronunciation) */}
-        <div className="flex flex-col gap-4 sm:gap-5 z-20">
+        <div className="flex flex-col justify-around h-full z-20 py-1">
           {rightNodes.map((node) => {
             const isConnectedToMe = Object.values(connections).includes(node.id);
+            const isHovered = hoveredRightId === node.id;
             return (
-              <div key={node.id} className="flex items-center gap-2 sm:gap-2.5">
+              <div
+                key={node.id}
+                ref={(el) => {
+                  rightRowRefs.current[node.id] = el;
+                }}
+                onClick={() => {
+                  if (Date.now() - lastTouchTimeRef.current < 450) return;
+                  handleRightRowClick(node.id);
+                }}
+                onTouchEnd={(e) => {
+                  lastTouchTimeRef.current = Date.now();
+                  if (activeLeftId) {
+                    e.preventDefault();
+                    connectPins(activeLeftId, node.id);
+                  }
+                }}
+                className={`flex items-center justify-end gap-1 sm:gap-2 cursor-pointer py-0.5 px-1 rounded transition-all active:scale-95 ${
+                  isHovered
+                    ? 'bg-amber-500/20 ring-2 ring-yellow-400'
+                    : isConnectedToMe
+                    ? 'bg-emerald-950/20'
+                    : 'hover:bg-slate-900/60'
+                }`}
+              >
                 {/* Japanese Name & English Pronunciation Text */}
-                <div className="flex flex-col items-end text-right">
-                  <div className="flex items-center gap-1.5">
+                <div className="flex flex-col items-end text-right min-w-[55px] xs:min-w-[65px] sm:min-w-[85px]">
+                  <div className="flex items-center justify-end gap-1 w-full">
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         sounds.speakJapanese(node.kana);
                       }}
-                      className="text-slate-400 hover:text-yellow-300 active:scale-125 text-xs transition-transform p-0.5 cursor-pointer"
+                      className="text-slate-400 hover:text-yellow-300 active:scale-125 text-xs transition-transform p-0.5 cursor-pointer shrink-0"
                       title={`Listen pronunciation for ${node.english}`}
                     >
                       🔊
                     </button>
-                    <span className="font-kana text-xs sm:text-sm font-bold text-slate-100 tracking-wider">
-                      {node.kana} <span className="text-[10px] sm:text-xs text-slate-400 font-normal">({node.kanji})</span>
+                    <span className="font-kana text-[10px] xs:text-[11px] sm:text-xs md:text-sm font-bold text-slate-100 tracking-wider">
+                      {node.kana}
                     </span>
                   </div>
-                  <span className="text-[10px] sm:text-xs font-mono text-cyan-300 font-bold tracking-wider">
+                  <span className="text-[8px] xs:text-[9px] sm:text-[10px] md:text-xs font-mono text-cyan-300 font-bold tracking-wider">
                     /{node.romaji}/
                   </span>
                 </div>
 
                 {/* Right Pin Terminal Socket with Kanji */}
                 <div
-                  ref={(el) => { rightPinRefs.current[node.id] = el; }}
-                  onMouseUp={() => handleDropOnRight(node.id)}
-                  onTouchEnd={() => handleDropOnRight(node.id)}
-                  onClick={() => {
-                    if (draggingLeftId) {
-                      handleDropOnRight(node.id);
-                    } else {
-                      sounds.speakJapanese(node.kana);
-                    }
+                  ref={(el) => {
+                    rightPinRefs.current[node.id] = el;
                   }}
-                  className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 flex items-center justify-center font-bold cursor-pointer transition-transform ${
+                  className={`w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center font-bold transition-all shadow-md ${
                     isConnectedToMe
-                      ? 'ring-4 ring-emerald-400 scale-105 shadow-xl'
-                      : 'hover:scale-110 shadow-lg'
+                      ? 'ring-4 ring-emerald-400 scale-105 shadow-emerald-500/40'
+                      : isHovered
+                      ? 'ring-4 ring-yellow-300 scale-110 shadow-yellow-500/50'
+                      : 'hover:scale-105'
                   }`}
                   style={{
                     backgroundColor: isConnectedToMe ? node.color : '#0f172a',
@@ -366,7 +496,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                   title={`${node.english} -> ${node.kana} (${node.romaji})`}
                 >
                   <span
-                    className={`font-kana font-extrabold text-sm sm:text-base ${
+                    className={`font-kana font-extrabold text-[11px] xs:text-xs sm:text-sm md:text-base ${
                       isConnectedToMe ? 'text-black font-black' : 'text-slate-200'
                     }`}
                   >
@@ -380,16 +510,18 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
 
         {/* Victory Review & Reward Overlay */}
         {won && (
-          <div className="absolute inset-0 bg-black/92 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in z-30">
-            <span className="text-emerald-400 text-base sm:text-lg mb-1 font-bold">★ COLORS HARMONIZED! ★</span>
-            <span className="text-xs text-slate-300 mb-3 text-center">You mastered 5 Japanese color terms:</span>
+          <div className="absolute inset-0 bg-black/92 flex flex-col items-center justify-center border-2 border-emerald-400 p-3 sm:p-4 animate-in fade-in z-30">
+            <span className="text-emerald-400 text-sm sm:text-lg mb-1 font-bold">★ COLORS HARMONIZED! ★</span>
+            <span className="text-[10px] sm:text-xs text-slate-300 mb-2 sm:mb-3 text-center">
+              You mastered 5 Japanese color terms:
+            </span>
 
             {/* Educational recap dictionary */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mb-4 w-full max-w-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-1.5 mb-3 w-full max-w-sm">
               {COLOR_SET.map((c) => (
                 <div
                   key={c.id}
-                  className="flex items-center justify-between bg-slate-900 border border-slate-700 px-2.5 py-1 rounded text-xs"
+                  className="flex items-center justify-between bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-[10px] sm:text-xs"
                 >
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
@@ -397,7 +529,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                   </div>
                   <div className="flex items-center gap-1">
                     <span className="font-kana text-yellow-300 font-bold">{c.kana}</span>
-                    <span className="text-[10px] font-mono text-cyan-300">({c.romaji})</span>
+                    <span className="text-[9px] font-mono text-cyan-300">({c.romaji})</span>
                     <button
                       onClick={() => sounds.speakJapanese(c.kana)}
                       className="text-xs hover:scale-125 transition-transform cursor-pointer ml-0.5"
@@ -412,7 +544,7 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
 
             <button
               onClick={() => onSuccess()}
-              className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer shadow-lg active:scale-95"
+              className="px-5 py-2 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer shadow-lg active:scale-95"
             >
               CLAIM REWARD NOW
             </button>
@@ -420,8 +552,8 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         )}
       </div>
 
-      <p className="text-[10px] sm:text-xs text-slate-400 mt-3 text-center">
-        Connect English colors to Japanese names. Tap 🔊 or right pins to hear native pronunciation!
+      <p className="text-[9px] sm:text-xs text-slate-400 mt-2 text-center">
+        Tap or drag pins to connect English to Japanese colors. Tap 🔊 to hear native pronunciation.
       </p>
     </div>
   );

@@ -71,14 +71,22 @@ export interface RoomData {
   requiredKana: string[];
   interactables: InteractableObject[];
   exitDoor: ExitDoor;
+  entranceDoor?: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
   playerSpawn: { x: number; y: number };
   decorations: Array<{
+    id?: string;
     x: number;
     y: number;
     type: 'plant' | 'rug' | 'table' | 'chair' | 'window' | 'lamp' | 'banner' | 'shelf';
     solid?: boolean;
     width?: number;
     height?: number;
+    displayTable?: boolean;
   }>;
 }
 
@@ -114,4 +122,6 @@ export interface GameSaveState {
   playtimeSeconds: number;
   volumeEnabled: boolean;
   shuffledRewards?: Record<string, KanaItem>;
+  roomHints?: Record<string, { revealedCount: number; lastHintTimestamp: number }>;
+  displayedItems?: Record<string, string[]>; // tableId -> word strings
 }

@@ -9,6 +9,7 @@ interface GameCardMatchProps {
 interface Card {
   id: number;
   kana: string;
+  reading: string;
   romaji: string;
   color: string;
   flipped: boolean;
@@ -16,30 +17,79 @@ interface Card {
 }
 
 const KANA_PAIRS = [
-  { kana: '星', romaji: 'Star', color: 'bg-yellow-500' },
-  { kana: '月', romaji: 'Moon', color: 'bg-indigo-500' },
-  { kana: '火', romaji: 'Fire', color: 'bg-rose-500' },
-  { kana: '水', romaji: 'Water', color: 'bg-cyan-500' },
-  { kana: '木', romaji: 'Tree', color: 'bg-emerald-500' },
-  { kana: '金', romaji: 'Gold', color: 'bg-amber-400' },
-  { kana: '土', romaji: 'Earth', color: 'bg-stone-500' },
-  { kana: '日', romaji: 'Sun', color: 'bg-red-500' },
+  { kana: '星', reading: 'ほし', romaji: 'Star (Hoshi)', color: 'bg-yellow-500' },
+  { kana: '月', reading: 'つき', romaji: 'Moon (Tsuki)', color: 'bg-indigo-500' },
+  { kana: '火', reading: 'ひ', romaji: 'Fire (Hi)', color: 'bg-rose-500' },
+  { kana: '水', reading: 'みず', romaji: 'Water (Mizu)', color: 'bg-cyan-500' },
+  { kana: '木', reading: 'き', romaji: 'Tree (Ki)', color: 'bg-emerald-500' },
+  { kana: '金', reading: 'きん', romaji: 'Gold (Kin)', color: 'bg-amber-400' },
+  { kana: '土', reading: 'つち', romaji: 'Earth (Tsuchi)', color: 'bg-stone-500' },
+  { kana: '日', reading: 'ひ', romaji: 'Sun (Hi)', color: 'bg-red-500' },
 ];
 
 export const GameCardMatch: React.FC<GameCardMatchProps> = ({ onSuccess }) => {
   const onSuccessRef = useRef(onSuccess);
   onSuccessRef.current = onSuccess;
 
-  // 4x4 grid = 16 cards = 8 pairs
-  const [cards, setCards] = useState<Card[]>(() => {
+  // Procedural generator guaranteeing matching pairs are NEVER adjacent to each other!
+  function generateProceduralBoard(): Card[] {
+    for (let attempt = 0; attempt < 500; attempt++) {
+      const board: (Card | null)[] = Array(16).fill(null);
+      const available = Array.from({ length: 16 }, (_, i) => i);
+
+      // True Fisher-Yates position shuffle
+      for (let i = available.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [available[i], available[j]] = [available[j], available[i]];
+      }
+
+      let success = true;
+      for (let pIdx = 0; pIdx < KANA_PAIRS.length; pIdx++) {
+        const pair = KANA_PAIRS[pIdx];
+        const pos1 = available.pop()!;
+
+        const r1 = Math.floor(pos1 / 4);
+        const c1 = pos1 % 4;
+
+        // Disallow matching cards placed right next to each other
+        const validCandidates = available.filter((p) => {
+          const r2 = Math.floor(p / 4);
+          const c2 = p % 4;
+          return Math.abs(r1 - r2) + Math.abs(c1 - c2) > 1;
+        });
+
+        if (validCandidates.length === 0) {
+          success = false;
+          break;
+        }
+
+        const chosenPos2 = validCandidates[Math.floor(Math.random() * validCandidates.length)];
+        const removeIdx = available.indexOf(chosenPos2);
+        available.splice(removeIdx, 1);
+
+        board[pos1] = { id: pIdx * 2, ...pair, flipped: false, matched: false };
+        board[chosenPos2] = { id: pIdx * 2 + 1, ...pair, flipped: false, matched: false };
+      }
+
+      if (success && board.every((c) => c !== null)) {
+        return board as Card[];
+      }
+    }
+
+    // Fallback Fisher-Yates
     const deck: Card[] = [];
     KANA_PAIRS.forEach((item, idx) => {
       deck.push({ id: idx * 2, ...item, flipped: false, matched: false });
       deck.push({ id: idx * 2 + 1, ...item, flipped: false, matched: false });
     });
-    return deck.sort(() => Math.random() - 0.5);
-  });
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    return deck;
+  }
 
+  const [cards, setCards] = useState<Card[]>(() => generateProceduralBoard());
   const [selectedCards, setSelectedCards] = useState<number[]>([]);
   const [matchesCount, setMatchesCount] = useState(0);
   const [moves, setMoves] = useState(0);
@@ -51,7 +101,7 @@ export const GameCardMatch: React.FC<GameCardMatchProps> = ({ onSuccess }) => {
     }
 
     sounds.playBlip(540);
-    sounds.speakJapanese(cards[index].kana);
+    sounds.speakJapanese(cards[index].reading);
     const nextCards = cards.map((c, i) => (i === index ? { ...c, flipped: true } : c));
     setCards(nextCards);
 
@@ -96,12 +146,7 @@ export const GameCardMatch: React.FC<GameCardMatchProps> = ({ onSuccess }) => {
   };
 
   const restart = () => {
-    const deck: Card[] = [];
-    KANA_PAIRS.forEach((item, idx) => {
-      deck.push({ id: idx * 2, ...item, flipped: false, matched: false });
-      deck.push({ id: idx * 2 + 1, ...item, flipped: false, matched: false });
-    });
-    setCards(deck.sort(() => Math.random() - 0.5));
+    setCards(generateProceduralBoard());
     setSelectedCards([]);
     setMatchesCount(0);
     setMoves(0);

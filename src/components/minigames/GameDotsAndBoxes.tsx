@@ -6,10 +6,11 @@ interface GameDotsAndBoxesProps {
   onFailure?: () => void;
 }
 
-const DOTS = 10;
-const BOXES = DOTS - 1; // 9x9 = 81 boxes
-const SPACING = 26;
-const OFFSET = 18;
+const DOTS = 5;
+const BOXES = DOTS - 1; // 4x4 = 16 boxes
+const SPACING = 48;
+const OFFSET = 39;
+const NEEDED_TO_WIN = 9;
 
 export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -66,7 +67,7 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
     return { nextBoxes, newlyClaimed };
   };
 
-  const getLineAtPoint = (clientX: number, clientY: number, tolerance: number = 10) => {
+  const getLineAtPoint = (clientX: number, clientY: number, tolerance: number = 18) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
@@ -154,7 +155,7 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
   };
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const line = hoveredLine || getLineAtPoint(e.clientX, e.clientY, 12);
+    const line = hoveredLine || getLineAtPoint(e.clientX, e.clientY, 18);
     if (line) {
       applyLineMove(line);
     }
@@ -163,7 +164,7 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length === 0) return;
     const touch = e.touches[0];
-    const line = getLineAtPoint(touch.clientX, touch.clientY, 14);
+    const line = getLineAtPoint(touch.clientX, touch.clientY, 22);
     if (line) {
       e.preventDefault();
       applyLineMove(line);
@@ -263,8 +264,8 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
       Object.keys(s.hLines).length === DOTS * BOXES &&
       Object.keys(s.vLines).length === BOXES * DOTS;
 
-    if (totalClaimed >= 40 || allLinesDone) {
-      if (s.playerScore >= s.aiScore) {
+    if (totalClaimed >= BOXES * BOXES || allLinesDone) {
+      if (s.playerScore > s.aiScore) {
         s.won = true;
         setWon(true);
         sounds.playSuccess();
@@ -280,11 +281,11 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
   // Canvas Hover detection
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!stateRef.current.isPlayerTurn) return;
-    const line = getLineAtPoint(e.clientX, e.clientY, 8);
+    const line = getLineAtPoint(e.clientX, e.clientY, 16);
     setHoveredLine(line);
   };
 
-  // Render 10x10 dots & lines on canvas
+  // Render 4x4 dots & lines on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -300,13 +301,15 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
       for (let c = 0; c < BOXES; c++) {
         const claimer = boxes[`${r}-${c}`];
         if (claimer) {
-          const bx = OFFSET + c * SPACING + 2;
-          const by = OFFSET + r * SPACING + 2;
+          const bx = OFFSET + c * SPACING + 3;
+          const by = OFFSET + r * SPACING + 3;
           ctx.fillStyle = claimer === 'P' ? 'rgba(56, 189, 248, 0.35)' : 'rgba(239, 68, 68, 0.35)';
-          ctx.fillRect(bx, by, SPACING - 4, SPACING - 4);
+          ctx.fillRect(bx, by, SPACING - 6, SPACING - 6);
           ctx.fillStyle = claimer === 'P' ? '#38bdf8' : '#ef4444';
-          ctx.font = '8px monospace';
-          ctx.fillText(claimer, bx + 7, by + 14);
+          ctx.font = 'bold 16px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(claimer, bx + (SPACING - 6) / 2, by + (SPACING - 6) / 2);
         }
       }
     }
@@ -321,10 +324,10 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
 
         if (claimer) {
           ctx.fillStyle = claimer === 'P' ? '#38bdf8' : '#ef4444';
-          ctx.fillRect(x1 + 3, y - 1.5, SPACING - 6, 3);
+          ctx.fillRect(x1 + 4, y - 2.5, SPACING - 8, 5);
         } else if (isHover && isPlayerTurn) {
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.6)';
-          ctx.fillRect(x1 + 3, y - 1, SPACING - 6, 2);
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
+          ctx.fillRect(x1 + 4, y - 2, SPACING - 8, 4);
         }
       }
     }
@@ -339,22 +342,22 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
 
         if (claimer) {
           ctx.fillStyle = claimer === 'P' ? '#38bdf8' : '#ef4444';
-          ctx.fillRect(x - 1.5, y1 + 3, 3, SPACING - 6);
+          ctx.fillRect(x - 2.5, y1 + 4, 5, SPACING - 8);
         } else if (isHover && isPlayerTurn) {
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.6)';
-          ctx.fillRect(x - 1, y1 + 3, 2, SPACING - 6);
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.7)';
+          ctx.fillRect(x - 2, y1 + 4, 4, SPACING - 8);
         }
       }
     }
 
-    // Draw 10x10 Dots
+    // Draw 5x5 Dots
     for (let r = 0; r < DOTS; r++) {
       for (let c = 0; c < DOTS; c++) {
         const x = OFFSET + c * SPACING;
         const y = OFFSET + r * SPACING;
         ctx.fillStyle = '#facc15';
         ctx.beginPath();
-        ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+        ctx.arc(x, y, 3.5, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -385,7 +388,7 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
     <div className="flex flex-col items-center select-none font-pixel w-full max-w-[540px]">
       <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm">
         <span className="text-cyan-400 font-bold">YOU: {playerScore} BOXES</span>
-        <span className="text-yellow-400 font-mono text-[10px] sm:text-xs">10x10 DOTS (81 BOXES)</span>
+        <span className="text-yellow-400 font-mono text-[10px] sm:text-xs">5x5 DOTS (16 BOXES — CLAIM MOST BOXES)</span>
         <span className="text-rose-400 font-bold">AI: {aiScore} BOXES</span>
       </div>
 
@@ -406,8 +409,8 @@ export const GameDotsAndBoxes: React.FC<GameDotsAndBoxesProps> = ({ onSuccess })
 
         {won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in z-20">
-            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ MAJORITY CAPTURED! ★</span>
-            <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">You conquered the 10x10 territory!</span>
+            <span className="text-emerald-400 text-base sm:text-lg mb-2 font-bold">★ ALL 16 BOXES COMPLETED! ★</span>
+            <span className="text-xs sm:text-sm text-slate-300 mb-4 text-center">You claimed the majority of the boxes!</span>
             <button
               onClick={() => onSuccessRef.current()}
               className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer shadow-lg"

@@ -17,7 +17,7 @@ export const ROOMS: RoomData[] = [
     targetWord: 'かぎ',
     targetMeaning: 'Key',
     targetIcon: '🔑',
-    clueHint: 'A steel security shutter sealed with a key mechanism. It requires the Japanese word for "Key" (かぎ).',
+    clueHint: 'A steel security shutter sealed with a key mechanism. It requires the Japanese word for "Key".',
     requiredKana: ['か', 'ぎ'],
     playerSpawn: { x: 11, y: 11 },
     exitDoor: {
@@ -28,7 +28,7 @@ export const ROOMS: RoomData[] = [
       targetWord: 'かぎ',
       targetMeaning: 'Key',
       targetIcon: '🔑',
-      clueHint: 'Engraved with a golden key symbol 🔑. It will not budge until you craft the word "かぎ".'
+      clueHint: 'Engraved with a golden key symbol 🔑. It will not budge until the seal is dissolved.'
     },
     interactables: [
       {
@@ -116,8 +116,8 @@ export const ROOMS: RoomData[] = [
       { x: 10, y: 8, type: 'rug', solid: false, width: 4, height: 3 },
       { x: 7, y: 2, type: 'window', solid: false, width: 2, height: 1 },
       { x: 15, y: 2, type: 'window', solid: false, width: 2, height: 1 },
-      { x: 2, y: 7, type: 'shelf', solid: true, width: 1, height: 2 },
-      { x: 19, y: 7, type: 'shelf', solid: true, width: 1, height: 2 },
+      { id: 'table_r1_1', x: 2, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
+      { id: 'table_r1_2', x: 18, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
     ]
   },
 
@@ -137,9 +137,15 @@ export const ROOMS: RoomData[] = [
     targetWord: 'とびら',
     targetMeaning: 'Door',
     targetIcon: '🚪',
-    clueHint: 'An ornate Shoji sliding portal barred by a heavy wooden beam. It requires the Japanese word for "Door" (とびら).',
+    clueHint: 'An ornate Shoji sliding portal barred by a heavy wooden beam. It requires the Japanese word for "Door".',
     requiredKana: ['と', 'び', 'ら'],
     playerSpawn: { x: 12, y: 14 },
+    entranceDoor: {
+      x: 12,
+      y: 16,
+      width: 2,
+      height: 2,
+    },
     exitDoor: {
       x: 12,
       y: 2,
@@ -148,7 +154,7 @@ export const ROOMS: RoomData[] = [
       targetWord: 'とびら',
       targetMeaning: 'Door',
       targetIcon: '🚪',
-      clueHint: 'Carved with an ornate Shoji gateway symbol 🚪. Unlocked by forming the word "とびら".'
+      clueHint: 'Carved with an ornate Shoji gateway symbol 🚪. It will not budge until the seal is dissolved.'
     },
     interactables: [
       {
@@ -249,8 +255,8 @@ export const ROOMS: RoomData[] = [
       { x: 10, y: 11, type: 'rug', solid: false, width: 4, height: 3 },
       { x: 8, y: 2, type: 'window', solid: false, width: 2, height: 1 },
       { x: 16, y: 2, type: 'window', solid: false, width: 2, height: 1 },
-      { x: 2, y: 6, type: 'shelf', solid: true, width: 1, height: 3 },
-      { x: 21, y: 6, type: 'shelf', solid: true, width: 1, height: 3 },
+      { id: 'table_r2_1', x: 2, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
+      { id: 'table_r2_2', x: 20, y: 7, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
     ]
   },
 
@@ -270,9 +276,15 @@ export const ROOMS: RoomData[] = [
     targetWord: 'でぐち',
     targetMeaning: 'Exit',
     targetIcon: '🚪',
-    clueHint: 'A majestic sealed Vermillion Torii archway draped in sacred Shimenawa rope. Craft the Japanese word for "Exit" (でぐち) to escape!',
+    clueHint: 'A majestic sealed Vermillion Torii archway draped in sacred Shimenawa rope. Craft the Japanese word for "Exit" to escape!',
     requiredKana: ['で', 'ぐ', 'ち'],
     playerSpawn: { x: 13, y: 16 },
+    entranceDoor: {
+      x: 13,
+      y: 18,
+      width: 2,
+      height: 2,
+    },
     exitDoor: {
       x: 13,
       y: 2,
@@ -382,8 +394,8 @@ export const ROOMS: RoomData[] = [
       { x: 11, y: 12, type: 'rug', solid: false, width: 4, height: 3 },
       { x: 8, y: 2, type: 'window', solid: false, width: 2, height: 1 },
       { x: 18, y: 2, type: 'window', solid: false, width: 2, height: 1 },
-      { x: 2, y: 7, type: 'shelf', solid: true, width: 1, height: 3 },
-      { x: 23, y: 7, type: 'shelf', solid: true, width: 1, height: 3 },
+      { id: 'table_r3_1', x: 2, y: 8, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
+      { id: 'table_r3_2', x: 21, y: 8, type: 'table', solid: true, width: 2, height: 1.5, displayTable: true },
     ]
   }
 ];

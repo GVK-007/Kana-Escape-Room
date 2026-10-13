@@ -20,6 +20,7 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
+  const [isStarted, setIsStarted] = useState(false);
 
   const dirRef = useRef(direction);
   dirRef.current = direction;
@@ -43,6 +44,7 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
   const restart = () => {
     setWon(false);
     setGameOver(false);
+    setIsStarted(false);
     setScore(0);
     const initialSnake = [
       { x: 5, y: 6 },
@@ -79,6 +81,7 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
   };
 
   const queueDirection = useCallback((newDir: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT') => {
+    setIsStarted(true);
     const queue = inputQueueRef.current;
     const lastDir = queue.length > 0 ? queue[queue.length - 1] : dirRef.current;
 
@@ -112,7 +115,7 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
 
   // Main game tick
   useEffect(() => {
-    if (gameOver || won) return;
+    if (gameOver || won || !isStarted) return;
 
     const interval = setInterval(() => {
       setSnake((prevSnake) => {
@@ -158,10 +161,10 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
 
         return newSnake;
       });
-    }, Math.max(110, 145 - score * 2.5));
+    }, Math.max(120, 175 - score * 3));
 
     return () => clearInterval(interval);
-  }, [gameOver, won, food, score]);
+  }, [gameOver, won, isStarted, food, score]);
 
   // O(1) fast position lookup for rendering
   const bodySet = new Set(snake.slice(1).map((s) => `${s.x},${s.y}`));
@@ -223,6 +226,17 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
             );
           })}
         </div>
+
+        {!isStarted && !gameOver && !won && (
+          <div
+            onClick={() => setIsStarted(true)}
+            className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center p-2 z-10 cursor-pointer animate-pulse"
+          >
+            <span className="font-pixel text-[10px] sm:text-xs text-yellow-300 bg-slate-900/90 border border-yellow-400 px-3 py-1.5 shadow-lg tracking-wider text-center">
+              SWIPE OR USE D-PAD TO START
+            </span>
+          </div>
+        )}
 
         {won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in duration-200 z-20">
