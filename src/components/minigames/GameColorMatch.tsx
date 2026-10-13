@@ -77,6 +77,8 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
   const [activeLeftId, setActiveLeftId] = useState<string | null>(null);
   const [hoveredRightId, setHoveredRightId] = useState<string | null>(null);
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorNodeId, setErrorNodeId] = useState<string | null>(null);
   const [won, setWon] = useState(false);
 
   // References to the board and all pin/row elements
@@ -88,6 +90,18 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
   // Prevent ghost mouse clicks after touch events on mobile
   const lastTouchTimeRef = useRef<number>(0);
   const isDraggingRef = useRef<boolean>(false);
+  const errorTimerRef = useRef<number | null>(null);
+
+  const showError = useCallback((msg: string, nodeId?: string) => {
+    sounds.playFail();
+    setErrorMessage(msg);
+    if (nodeId) setErrorNodeId(nodeId);
+    if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    errorTimerRef.current = window.setTimeout(() => {
+      setErrorMessage(null);
+      setErrorNodeId(null);
+    }, 1200);
+  }, []);
 
   useEffect(() => {
     const l = [...COLOR_SET];
@@ -97,6 +111,10 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
     setConnections({});
     setActiveLeftId(null);
     setDragPos(null);
+
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
   }, []);
 
   // Convert element or client coordinates into exact internal SVG coordinates inside boardRef
@@ -156,26 +174,41 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
     (leftId: string, rightId: string) => {
       if (won) return;
 
+      // 1. Prevent connecting to already finished right nodes
+      if (Object.values(connections).includes(rightId)) {
+        showError('ALREADY CONNECTED!', rightId);
+        setActiveLeftId(null);
+        setDragPos(null);
+        setHoveredRightId(null);
+        isDraggingRef.current = false;
+        return;
+      }
+
+      // 2. Only allow matching colors (leftId must equal rightId)
+      if (leftId !== rightId) {
+        showError('WRONG COLOR! MATCH BY COLOR', rightId);
+        setActiveLeftId(null);
+        setDragPos(null);
+        setHoveredRightId(null);
+        isDraggingRef.current = false;
+        return;
+      }
+
+      // 3. Correct match!
       const targetNode = COLOR_SET.find((c) => c.id === rightId);
       if (targetNode) {
         sounds.speakJapanese(targetNode.kana);
-      } else {
-        sounds.playKanaObtained();
       }
+      sounds.playKanaObtained();
 
       setConnections((prev) => {
         const next = { ...prev, [leftId]: rightId };
 
         // Verify if all 5 colors are correctly connected
         if (Object.keys(next).length === COLOR_SET.length) {
-          const allMatched = Object.entries(next).every(([l, r]) => l === r);
-          if (allMatched) {
-            setWon(true);
-            sounds.playSuccess();
-            setTimeout(() => onSuccess(), 1200);
-          } else {
-            sounds.playFail();
-          }
+          setWon(true);
+          sounds.playSuccess();
+          setTimeout(() => onSuccess(), 1200);
         }
         return next;
       });
@@ -185,28 +218,19 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
       setHoveredRightId(null);
       isDraggingRef.current = false;
     },
-    [won, onSuccess]
+    [won, connections, onSuccess, showError]
   );
-
-  const removeConnection = (leftId: string) => {
-    if (won) return;
-    sounds.playBlip(320);
-    setConnections((prev) => {
-      const next = { ...prev };
-      delete next[leftId];
-      return next;
-    });
-    setActiveLeftId(null);
-    setDragPos(null);
-  };
 
   // User starts interacting with a Left Pin (click or touch)
   const handleLeftPinStart = (leftId: string, clientX?: number, clientY?: number) => {
     if (won) return;
 
-    // If already connected, tapping it disconnects it
+    // If already connected, do not allow starting a new wire
     if (connections[leftId]) {
-      removeConnection(leftId);
+      const targetNode = COLOR_SET.find((c) => c.id === leftId);
+      if (targetNode) {
+        sounds.speakJapanese(targetNode.kana);
+      }
       return;
     }
 
@@ -234,7 +258,11 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
     if (!activeLeftId || !isDraggingRef.current) return;
     setDragPos(getInternalCoords(clientX, clientY));
     const target = findTargetRightNode(clientX, clientY);
-    setHoveredRightId(target);
+    if (target && !Object.values(connections).includes(target)) {
+      setHoveredRightId(target);
+    } else {
+      setHoveredRightId(null);
+    }
   };
 
   // User releases pointer
@@ -274,9 +302,26 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
   return (
     <div className="flex flex-col items-center select-none font-pixel w-full max-w-[580px]">
       <div className="flex justify-between items-center w-full mb-1 sm:mb-2 text-xs sm:text-sm px-1">
-        <span className="text-amber-400 font-bold">ENGLISH ➔ 日本語 COLORS</span>
-        <span className="text-cyan-400 text-[10px] sm:text-xs">
-          {activeLeftId ? 'TAP MATCHING JAPANESE PIN' : 'TAP OR DRAG WIRES'}
+        <div className="flex items-center gap-2">
+          <span className="text-amber-400 font-bold">ENGLISH ➔ 日本語 COLORS</span>
+          <span className="text-[10px] font-mono text-slate-400">
+            ({Object.keys(connections).length}/{COLOR_SET.length})
+          </span>
+        </div>
+        <span
+          className={`text-[10px] sm:text-xs transition-colors font-bold ${
+            errorMessage
+              ? 'text-rose-400 animate-pulse'
+              : activeLeftId
+              ? 'text-yellow-300'
+              : 'text-cyan-400'
+          }`}
+        >
+          {errorMessage
+            ? `❌ ${errorMessage}`
+            : activeLeftId
+            ? 'TAP MATCHING JAPANESE PIN'
+            : 'MATCH SAME COLORS (TAP / DRAG)'}
         </span>
       </div>
 
@@ -392,7 +437,9 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                 onMouseDown={(e) => {
                   handleLeftPinStart(node.id, e.clientX, e.clientY);
                 }}
-                className="flex items-center gap-1 sm:gap-2.5 cursor-pointer py-0.5 group active:scale-95 transition-transform"
+                className={`flex items-center gap-1 sm:gap-2.5 py-0.5 transition-transform ${
+                  isConnected ? 'cursor-default opacity-90' : 'cursor-pointer group active:scale-95'
+                }`}
               >
                 <div
                   ref={(el) => {
@@ -402,14 +449,14 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                     isSelected
                       ? 'ring-4 ring-yellow-300 scale-110 shadow-yellow-500/50'
                       : isConnected
-                      ? 'ring-2 ring-emerald-400/80 opacity-90'
+                      ? 'ring-3 ring-emerald-400 scale-105 shadow-emerald-500/40 opacity-90'
                       : 'group-hover:scale-105'
                   }`}
                   style={{ backgroundColor: node.color, borderColor: node.borderColor }}
                   title={`${node.english} (${node.symbol})`}
                 >
                   <span className="text-black font-extrabold text-[10px] sm:text-xs md:text-sm">
-                    {node.symbol}
+                    {isConnected ? '✓' : node.symbol}
                   </span>
                 </div>
                 <span
@@ -428,7 +475,8 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
         <div className="flex flex-col justify-around h-full z-20 py-1">
           {rightNodes.map((node) => {
             const isConnectedToMe = Object.values(connections).includes(node.id);
-            const isHovered = hoveredRightId === node.id;
+            const isHovered = hoveredRightId === node.id && !isConnectedToMe;
+            const isError = errorNodeId === node.id;
             return (
               <div
                 key={node.id}
@@ -446,12 +494,14 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                     connectPins(activeLeftId, node.id);
                   }
                 }}
-                className={`flex items-center justify-end gap-1 sm:gap-2 cursor-pointer py-0.5 px-1 rounded transition-all active:scale-95 ${
-                  isHovered
+                className={`flex items-center justify-end gap-1 sm:gap-2 py-0.5 px-1 rounded transition-all active:scale-95 ${
+                  isError
+                    ? 'bg-rose-500/20 ring-2 ring-rose-400'
+                    : isHovered
                     ? 'bg-amber-500/20 ring-2 ring-yellow-400'
                     : isConnectedToMe
-                    ? 'bg-emerald-950/20'
-                    : 'hover:bg-slate-900/60'
+                    ? 'bg-emerald-950/20 cursor-default'
+                    : 'hover:bg-slate-900/60 cursor-pointer'
                 }`}
               >
                 {/* Japanese Name & English Pronunciation Text */}
@@ -483,7 +533,9 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                     rightPinRefs.current[node.id] = el;
                   }}
                   className={`w-7 h-7 xs:w-8 xs:h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-full border-2 flex items-center justify-center font-bold transition-all shadow-md ${
-                    isConnectedToMe
+                    isError
+                      ? 'ring-4 ring-rose-500 scale-110 shadow-rose-500/50 animate-pulse'
+                      : isConnectedToMe
                       ? 'ring-4 ring-emerald-400 scale-105 shadow-emerald-500/40'
                       : isHovered
                       ? 'ring-4 ring-yellow-300 scale-110 shadow-yellow-500/50'
@@ -491,16 +543,16 @@ export const GameColorMatch: React.FC<GameColorMatchProps> = ({ onSuccess }) => 
                   }`}
                   style={{
                     backgroundColor: isConnectedToMe ? node.color : '#0f172a',
-                    borderColor: node.color,
+                    borderColor: isError ? '#f43f5e' : node.color,
                   }}
                   title={`${node.english} -> ${node.kana} (${node.romaji})`}
                 >
                   <span
                     className={`font-kana font-extrabold text-[11px] xs:text-xs sm:text-sm md:text-base ${
-                      isConnectedToMe ? 'text-black font-black' : 'text-slate-200'
+                      isConnectedToMe ? 'text-black font-black' : isError ? 'text-rose-400 font-bold' : 'text-slate-200'
                     }`}
                   >
-                    {node.kanji}
+                    {isConnectedToMe ? '✓' : node.kanji}
                   </span>
                 </div>
               </div>

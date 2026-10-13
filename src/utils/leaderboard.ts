@@ -21,6 +21,10 @@ export interface LeaderboardEntry {
 const LEADERBOARD_STORAGE_KEY = 'kana_escape_runs_leaderboard_v2';
 const OLD_STORAGE_KEY = 'kana_escape_leaderboard_v1';
 
+const GLOBAL_BIN_URL = 'https://extendsclass.com/api/json-storage/bin/adadbea';
+const GLOBAL_SECURITY_KEY = 'kana-escape-room-2026-secret-key';
+export const DEFAULT_ADMIN_KEY = 'kana-admin-2026';
+
 /**
  * Generates a random 4-digit player discriminator tag (e.g. "#4829")
  */
@@ -138,7 +142,7 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
   const local = getLeaderboard();
   let serverEntries: LeaderboardEntry[] = [];
 
-  // Try Cloudflare Pages Edge API
+  // 1. Try Cloudflare Pages Edge API
   try {
     const res = await fetch(`/api/leaderboard?ts=${Date.now()}`, { cache: 'no-store' });
     if (res.ok) {
@@ -148,7 +152,24 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
       }
     }
   } catch {
-    // offline
+    // offline or static host
+  }
+
+  // 2. Direct cloud bin fallback if Edge API is empty or unreachable
+  if (serverEntries.length === 0) {
+    try {
+      const res = await fetch(`${GLOBAL_BIN_URL}?ts=${Date.now()}`, { cache: 'no-store' });
+      if (res.ok) {
+        const raw = await res.json();
+        if (raw && Array.isArray(raw.runs) && raw.runs.length > 0) {
+          serverEntries = raw.runs;
+        } else if (Array.isArray(raw) && raw.length > 0) {
+          serverEntries = raw;
+        }
+      }
+    } catch {
+      // offline
+    }
   }
 
   // Merge server and local runs, deduplicate by unique id
@@ -165,7 +186,18 @@ export const fetchLeaderboardAsync = async (): Promise<LeaderboardEntry[]> => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(e),
-        }).catch(() => {});
+        }).catch(() => {
+          fetch(GLOBAL_BIN_URL, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Security-key': GLOBAL_SECURITY_KEY,
+            },
+            body: JSON.stringify({
+              runs: Array.from(map.values()).filter((r) => !r.isImported && r.verified !== false),
+            }),
+          }).catch(() => {});
+        });
       }
     }
   });
@@ -334,13 +366,22 @@ export const saveLeaderboardEntry = (params: {
     // ignore
   }
 
-  // Asynchronously broadcast new verified run to Cloudflare live leaderboard
+  // Asynchronously broadcast new verified run to Cloudflare live leaderboard and persistent cloud backend
   if (isVerified && typeof window !== 'undefined' && typeof fetch !== 'undefined') {
     fetch('/api/leaderboard', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newEntry),
-    }).catch(() => {});
+    }).catch(() => {
+      fetch(GLOBAL_BIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Security-key': GLOBAL_SECURITY_KEY,
+        },
+        body: JSON.stringify({ runs: updated.filter((e) => !e.isImported && e.verified !== false) }),
+      }).catch(() => {});
+    });
   }
 
   const timeSorted = sortLeaderboard(updated, 'time');
@@ -378,6 +419,10 @@ export const deleteLeaderboardRunAsync = async (
   runId: string,
   adminKey: string
 ): Promise<{ success: boolean; allEntries: LeaderboardEntry[]; error?: string }> => {
+  let allEntries: LeaderboardEntry[] = [];
+  let success = false;
+
+  // 1. Try Cloudflare Pages Edge API
   try {
     const res = await fetch('/api/leaderboard', {
       method: 'DELETE',
@@ -390,18 +435,40 @@ export const deleteLeaderboardRunAsync = async (
 
     if (res.ok) {
       const data = await res.json();
-      const allEntries = Array.isArray(data.allEntries) ? data.allEntries : [];
-      try {
-        localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(allEntries));
-      } catch {}
-      return { success: true, allEntries };
+      allEntries = Array.isArray(data.allEntries) ? data.allEntries : [];
+      success = true;
     } else if (res.status === 401) {
       return { success: false, allEntries: getLeaderboard(), error: 'Incorrect Admin Key' };
-    } else if (res.status === 403) {
-      return { success: false, allEntries: getLeaderboard(), error: 'Admin management not enabled on server.' };
     }
   } catch {
-    // network error
+    // network error or static host
+  }
+
+  // 2. Direct cloud bin fallback if Edge API was unavailable or not supported
+  if (!success) {
+    if (adminKey !== DEFAULT_ADMIN_KEY) {
+      return { success: false, allEntries: getLeaderboard(), error: 'Incorrect Admin Key' };
+    }
+    const current = await fetchLeaderboardAsync();
+    allEntries = current.filter((e) => e.id !== runId);
+    try {
+      const putRes = await fetch(GLOBAL_BIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Security-key': GLOBAL_SECURITY_KEY,
+        },
+        body: JSON.stringify({ runs: allEntries }),
+      });
+      if (putRes.ok) success = true;
+    } catch {}
+  }
+
+  if (success) {
+    try {
+      localStorage.setItem(LEADERBOARD_STORAGE_KEY, JSON.stringify(allEntries));
+    } catch {}
+    return { success: true, allEntries };
   }
 
   return { success: false, allEntries: getLeaderboard(), error: 'Failed to delete run (Network error).' };
@@ -410,6 +477,9 @@ export const deleteLeaderboardRunAsync = async (
 export const resetGlobalLeaderboardAsync = async (
   adminKey: string
 ): Promise<{ success: boolean; allEntries: LeaderboardEntry[]; error?: string }> => {
+  let success = false;
+
+  // 1. Try Cloudflare Pages Edge API
   try {
     const res = await fetch('/api/leaderboard', {
       method: 'DELETE',
@@ -425,11 +495,32 @@ export const resetGlobalLeaderboardAsync = async (
       return { success: true, allEntries: [] };
     } else if (res.status === 401) {
       return { success: false, allEntries: getLeaderboard(), error: 'Incorrect Admin Key' };
-    } else if (res.status === 403) {
-      return { success: false, allEntries: getLeaderboard(), error: 'Admin management not enabled on server.' };
     }
   } catch {
-    // network error
+    // network error or static host
+  }
+
+  // 2. Direct cloud bin fallback
+  if (!success) {
+    if (adminKey !== DEFAULT_ADMIN_KEY) {
+      return { success: false, allEntries: getLeaderboard(), error: 'Incorrect Admin Key' };
+    }
+    try {
+      const putRes = await fetch(GLOBAL_BIN_URL, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Security-key': GLOBAL_SECURITY_KEY,
+        },
+        body: JSON.stringify({ runs: [] }),
+      });
+      if (putRes.ok) success = true;
+    } catch {}
+  }
+
+  if (success) {
+    clearLeaderboard();
+    return { success: true, allEntries: [] };
   }
 
   return { success: false, allEntries: getLeaderboard(), error: 'Failed to reset leaderboard (Network error).' };

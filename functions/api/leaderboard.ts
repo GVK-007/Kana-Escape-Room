@@ -26,6 +26,10 @@ interface Env {
 // In-memory fallback across warm edge nodes
 let memoryLeaderboard: LeaderboardEntry[] = [];
 
+const GLOBAL_BIN_URL = 'https://extendsclass.com/api/json-storage/bin/adadbea';
+const GLOBAL_SECURITY_KEY = 'kana-escape-room-2026-secret-key';
+const DEFAULT_ADMIN_KEY = 'kana-admin-2026';
+
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
@@ -34,25 +38,65 @@ const CORS_HEADERS = {
   'Cache-Control': 'no-cache, no-store, must-revalidate',
 };
 
+async function fetchRemoteEntries(): Promise<LeaderboardEntry[]> {
+  try {
+    const res = await fetch(`${GLOBAL_BIN_URL}?ts=${Date.now()}`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data: any = await res.json();
+      if (data && Array.isArray(data.runs) && data.runs.length > 0) return data.runs;
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {}
+  return [];
+}
+
+async function saveRemoteEntries(entries: LeaderboardEntry[]): Promise<boolean> {
+  try {
+    const res = await fetch(GLOBAL_BIN_URL, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Security-key': GLOBAL_SECURITY_KEY,
+      },
+      body: JSON.stringify({ runs: entries }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export const onRequestGet = async (context: { env: Env }) => {
   try {
     let entries: LeaderboardEntry[] = [];
     let kvFound = false;
 
-    // Check Cloudflare KV if bound
+    // 1. Check Cloudflare KV if bound
     if (context.env?.LEADERBOARD_KV) {
       try {
         const data = await context.env.LEADERBOARD_KV.get('global_leaderboard', 'json');
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && data.length > 0) {
           entries = data;
           kvFound = true;
         }
       } catch {}
     }
 
-    // Fallback to in-memory cache if KV is not bound
-    if (!kvFound && memoryLeaderboard.length > 0) {
+    // 2. Persistent cloud fallback if KV is unbound or empty
+    if (!kvFound || entries.length === 0) {
+      const remote = await fetchRemoteEntries();
+      if (remote.length > 0) {
+        entries = remote;
+      }
+    }
+
+    // 3. Fallback to in-memory cache
+    if (entries.length === 0 && memoryLeaderboard.length > 0) {
       entries = memoryLeaderboard;
+    } else if (entries.length > 0) {
+      memoryLeaderboard = entries;
     }
 
     return new Response(JSON.stringify(entries), {
@@ -151,15 +195,17 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     if (context.env?.LEADERBOARD_KV) {
       try {
         const data = await context.env.LEADERBOARD_KV.get('global_leaderboard', 'json');
-        if (Array.isArray(data)) entries = data;
+        if (Array.isArray(data) && data.length > 0) entries = data;
       } catch {}
-    } else if (memoryLeaderboard.length > 0) {
-      entries = memoryLeaderboard;
     }
+
+    const remoteEntries = await fetchRemoteEntries();
 
     // Merge entries
     const map = new Map<string, LeaderboardEntry>();
+    remoteEntries.forEach((e) => map.set(e.id, e));
     entries.forEach((e) => map.set(e.id, e));
+    memoryLeaderboard.forEach((e) => map.set(e.id, e));
 
     // Ensure server stamps verified
     const sanitizedEntry: LeaderboardEntry = {
@@ -189,12 +235,15 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
     memoryLeaderboard = allEntries;
 
-    // Persist to Cloudflare KV if bound
+    // 1. Persist to Cloudflare KV if bound
     if (context.env?.LEADERBOARD_KV) {
       try {
         await context.env.LEADERBOARD_KV.put('global_leaderboard', JSON.stringify(allEntries));
       } catch {}
     }
+
+    // 2. Persist to persistent global cloud storage
+    await saveRemoteEntries(allEntries);
 
     return new Response(JSON.stringify({ success: true, allEntries }), {
       status: 200,
@@ -232,9 +281,14 @@ export const onRequestDelete = async (context: { request: Request; env: Env }) =
     if (context.env?.LEADERBOARD_KV) {
       try {
         const kvData = await context.env.LEADERBOARD_KV.get('global_leaderboard', 'json');
-        if (Array.isArray(kvData)) entries = kvData;
+        if (Array.isArray(kvData) && kvData.length > 0) entries = kvData;
       } catch {}
-    } else {
+    }
+    if (entries.length === 0) {
+      const remote = await fetchRemoteEntries();
+      if (remote.length > 0) entries = remote;
+    }
+    if (entries.length === 0) {
       entries = memoryLeaderboard;
     }
 
@@ -251,6 +305,8 @@ export const onRequestDelete = async (context: { request: Request; env: Env }) =
         await context.env.LEADERBOARD_KV.put('global_leaderboard', JSON.stringify(entries));
       } catch {}
     }
+
+    await saveRemoteEntries(entries);
 
     return new Response(JSON.stringify({ success: true, allEntries: entries }), {
       status: 200,
