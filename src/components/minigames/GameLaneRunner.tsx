@@ -7,9 +7,10 @@ interface GameLaneRunnerProps {
   targetMeters?: number;
 }
 
-export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targetMeters = 250 }) => {
+export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targetMeters = 120 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [distance, setDistance] = useState(0);
+  const [lives, setLives] = useState(3);
   const [speedVal, setSpeedVal] = useState('1.0x');
   const [won, setWon] = useState(false);
   const [gameOver, setGameOver] = useState(false);
@@ -26,6 +27,8 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
     laneX: [45, 125, 205],
     currentX: 125,
     distance: 0,
+    lives: 3,
+    invulnerableTimer: 0,
     obstacles: [] as { lane: number; y: number; type: 'barrier' | 'spike' }[],
     won: false,
     gameOver: false,
@@ -35,7 +38,7 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
 
   const changeLane = (dir: -1 | 1) => {
     const now = Date.now();
-    if (now - lastLaneChangeTimeRef.current < 160) return;
+    if (now - lastLaneChangeTimeRef.current < 90) return;
     lastLaneChangeTimeRef.current = now;
 
     const s = stateRef.current;
@@ -54,14 +57,17 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
       laneX: [45, 125, 205],
       currentX: 125,
       distance: 0,
+      lives: 3,
+      invulnerableTimer: 0,
       obstacles: [
-        { lane: 0, y: -40, type: 'barrier' },
-        { lane: 2, y: -120, type: 'barrier' },
+        { lane: 0, y: -50, type: 'barrier' },
+        { lane: 2, y: -140, type: 'barrier' },
       ],
       won: false,
       gameOver: false,
     };
     setDistance(0);
+    setLives(3);
     setSpeedVal('1.0x');
     setWon(false);
     setGameOver(false);
@@ -86,30 +92,36 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
       const s = stateRef.current;
 
       if (!s.won && !s.gameOver) {
-        // Progressively faster speed: starts at 3.2, ramps up to 7.8!
+        // Balanced speed: starts comfortably at 2.2, gently ramps to 3.5
         const progress = Math.min(1, s.distance / targetMetersRef.current);
-        const currentSpeed = 3.2 + progress * 4.6;
-        s.distance += (0.2 + progress * 0.25) * dt;
+        const currentSpeed = 2.2 + progress * 1.3;
+        s.distance += (0.22 + progress * 0.18) * dt;
+
+        if (s.invulnerableTimer > 0) {
+          s.invulnerableTimer -= dt;
+        }
 
         // Throttle React state updates to 10Hz instead of 60Hz to save CPU
         if (nowTime - lastHudTime > 100) {
           lastHudTime = nowTime;
           setDistance(Math.floor(s.distance));
-          setSpeedVal(`${(currentSpeed / 3.2).toFixed(1)}x`);
+          setSpeedVal(`${(currentSpeed / 2.2).toFixed(1)}x`);
         }
 
-        // Smooth lane interpolation
+        // Smooth lane interpolation (snappier response)
         const targetX = s.laneX[s.lane];
-        s.currentX += (targetX - s.currentX) * Math.min(1.0, 0.35 * dt);
+        s.currentX += (targetX - s.currentX) * Math.min(1.0, 0.42 * dt);
 
-        // Progressive obstacle spawn interval
+        // Balanced obstacle spawn interval: 40 to 65 frames (comfortable reaction window)
         spawnCounter += dt;
-        const spawnThreshold = Math.max(18, Math.floor(40 - progress * 20));
+        const spawnThreshold = Math.max(38, Math.floor(65 - progress * 25));
         if (spawnCounter > spawnThreshold) {
           spawnCounter = 0;
-          const randomLane = Math.floor(Math.random() * 3);
+          // Avoid spawning back-to-back in lanes with an active hazard close by
+          const safeLanes = [0, 1, 2].filter((l) => !s.obstacles.some((o) => o.lane === l && o.y < 55));
+          const spawnLane = safeLanes.length > 0 ? safeLanes[Math.floor(Math.random() * safeLanes.length)] : Math.floor(Math.random() * 3);
           s.obstacles.push({
-            lane: randomLane,
+            lane: spawnLane,
             y: -25,
             type: Math.random() > 0.5 ? 'barrier' : 'spike',
           });
@@ -120,11 +132,22 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
           const obs = s.obstacles[i];
           obs.y += currentSpeed * dt;
 
-          // Check collision with player at y: 155
-          if (obs.y >= 138 && obs.y <= 168 && s.lane === obs.lane) {
-            s.gameOver = true;
-            setGameOver(true);
-            sounds.playFail();
+          // Check collision with player at y: 155 with forgiving hitbox
+          if (obs.y >= 143 && obs.y <= 163 && s.lane === obs.lane) {
+            if (s.invulnerableTimer <= 0) {
+              s.lives -= 1;
+              setLives(s.lives);
+              s.obstacles.splice(i, 1);
+              if (s.lives <= 0) {
+                s.gameOver = true;
+                setGameOver(true);
+                sounds.playFail();
+              } else {
+                s.invulnerableTimer = 60; // 1s invulnerability after getting hit
+                sounds.playBump();
+              }
+              continue;
+            }
           }
 
           if (obs.y > 215) {
@@ -189,15 +212,20 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
         ctx.fillRect(ox + 22, obs.y + 2, 6, 10);
       }
 
-      // Player Runner
-      const px = s.currentX - 10;
-      ctx.fillStyle = '#38bdf8'; // Blue runner
-      ctx.fillRect(px, 155, 20, 22);
-      ctx.fillStyle = '#facc15'; // Yellow hair
-      ctx.fillRect(px + 2, 153, 16, 6);
-      ctx.fillStyle = '#ef4444'; // Shoes
-      ctx.fillRect(px + 2, 175, 6, 4);
-      ctx.fillRect(px + 12, 175, 6, 4);
+      // Player Runner (flashes when invulnerable)
+      const isInvulnerable = s.invulnerableTimer > 0;
+      const flashHidden = isInvulnerable && Math.floor(s.invulnerableTimer / 4) % 2 === 1;
+
+      if (!flashHidden) {
+        const px = s.currentX - 10;
+        ctx.fillStyle = isInvulnerable ? '#7dd3fc' : '#38bdf8'; // Blue runner (lighter when invulnerable)
+        ctx.fillRect(px, 155, 20, 22);
+        ctx.fillStyle = '#facc15'; // Yellow hair
+        ctx.fillRect(px + 2, 153, 16, 6);
+        ctx.fillStyle = '#ef4444'; // Shoes
+        ctx.fillRect(px + 2, 175, 6, 4);
+        ctx.fillRect(px + 12, 175, 6, 4);
+      }
 
       animId = requestAnimationFrame(loop);
     };
@@ -265,7 +293,14 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
   return (
     <div className="flex flex-col items-center select-none font-pixel w-full max-w-[580px]">
       <div className="flex justify-between items-center w-full mb-2 text-xs sm:text-sm px-1">
-        <span className="text-cyan-400 font-bold">DISTANCE: {distance}m / {targetMeters}m</span>
+        <span className="text-cyan-400 font-bold">DIST: {distance}m / {targetMeters}m</span>
+        <div className="flex items-center gap-1" title={`${lives} Lives Remaining`}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <span key={i} className={`text-xs sm:text-sm transition-opacity ${i < lives ? 'opacity-100 scale-100' : 'opacity-20 grayscale'}`}>
+              ❤️
+            </span>
+          ))}
+        </div>
         <span className="text-yellow-400 font-mono text-[10px] sm:text-xs">SPEED: {speedVal}</span>
       </div>
 
@@ -294,7 +329,7 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
         {won && (
           <div className="absolute inset-0 bg-black/85 flex flex-col items-center justify-center border-2 border-emerald-400 p-4 animate-in fade-in">
             <span className="text-emerald-400 text-sm sm:text-base mb-1 font-bold">★ RUNWAY CONQUERED! ★</span>
-            <span className="text-xs text-slate-300 mb-3">Survived the 250m hyper-acceleration sprint!</span>
+            <span className="text-xs text-slate-300 mb-3">Survived the {targetMeters}m sprint!</span>
             <button
               onClick={() => onSuccessRef.current()}
               className="px-6 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-black text-xs sm:text-sm font-bold border-2 border-white cursor-pointer active:translate-y-0.5 shadow-lg"

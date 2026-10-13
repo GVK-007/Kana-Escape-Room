@@ -193,8 +193,13 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
     }
     tapTargetRef.current = null;
     tapRippleRef.current = null;
+    const isPortrait = device.orientation === 'portrait';
+    const initScale = isPortrait
+      ? (room.id === 'room-3' || room.number === 3 ? 2.10 : (room.id === 'room-2' || room.number === 2 ? 2.35 : 2.85))
+      : (device.scale || DEFAULT_SCALE);
+    camOffsetRef.current.scale = initScale;
     atmosphereRef.current.init(room.id, room.width, room.height, TILE_SIZE);
-  }, [room, spawnDirection]);
+  }, [room, spawnDirection, device.orientation, device.scale]);
 
   // When locked (minigame or modal active), clear keys and stop movement
   useEffect(() => {
@@ -720,13 +725,13 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
-      // Center camera on player with room-specific scale (Room 1: 2.85 perfect; Room 2: 2.35; Room 3: 2.10)
+      // Center camera on player with room-specific scale (Room 1: 2.85; Room 2: 2.35; Room 3: 2.10)
       const isPortrait = device.orientation === 'portrait';
       let currentScale = device.scale || DEFAULT_SCALE;
       if (isPortrait) {
-        if (room.id === 'room-3') {
+        if (room.id === 'room-3' || room.number === 3) {
           currentScale = 2.10;
-        } else if (room.id === 'room-2') {
+        } else if (room.id === 'room-2' || room.number === 2) {
           currentScale = 2.35;
         } else {
           currentScale = 2.85;
@@ -994,7 +999,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
     <div className={`w-full flex flex-col items-center select-none ${isPortraitEmulator ? 'h-full flex-1 justify-between min-h-0' : 'h-full justify-center my-auto'}`}>
       {/* 1. Upper Console Screen (Pure Game Viewport) */}
       <div
-        className={`relative flex flex-col items-center justify-center w-full transition-all bg-black border-4 border-slate-800 pixel-box shadow-2xl overflow-hidden ${
+        className={`relative flex flex-col items-center justify-center w-full bg-black border-4 border-slate-800 pixel-box shadow-2xl overflow-hidden ${
           isPortraitEmulator
             ? 'flex-1 min-h-0 rounded-t-sm'
             : device.isDesktop
@@ -1154,7 +1159,7 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
       </div>
 
       {/* 2. Lower Handheld Emulator Control Deck (Dedicated Bottom Controller Panel in Portrait) */}
-      {isPortraitEmulator && !isLocked && (
+      {isPortraitEmulator && (
         <div className="w-full max-w-xl sm:max-w-2xl flex flex-col justify-between shrink-0 h-[46dvh] max-h-[380px] min-h-[250px] bg-gradient-to-b from-[#1c1b36] via-[#141328] to-[#0a0914] border-4 border-t-0 border-slate-800 shadow-[inset_0_2px_4px_rgba(255,255,255,0.08),0_12px_32px_rgba(0,0,0,0.9)] rounded-b-xl px-3 py-2 sm:px-5 sm:py-3 select-none touch-none">
           {/* Top Console Bevel & Branding Strip */}
           <div className="w-full flex justify-between items-center pb-1 border-b border-slate-700/60 text-[8px] font-pixel text-slate-400">

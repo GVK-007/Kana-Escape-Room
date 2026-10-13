@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+html, body {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
 @layer utilities {
   .font-pixel {
     font-family: 'Press Start 2P', monospace;
