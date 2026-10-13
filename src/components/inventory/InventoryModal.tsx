@@ -326,23 +326,32 @@ export const InventoryModal: React.FC<InventoryModalProps> = ({
   const collectibleSlots = Array.from({ length: collectibleSlotCount }, (_, idx) => craftedWords[idx] || null);
 
   const isLandscapeMobile = windowSize.height < 540 && windowSize.width > windowSize.height;
+  const isPortrait = windowSize.width <= windowSize.height;
   const availH = Math.max(220, windowSize.height - 12);
   const availW = Math.max(280, windowSize.width - 16);
-  const targetH = isLandscapeMobile ? 290 : 620;
-  const targetW = isLandscapeMobile ? 740 : 800;
-  const scale = Math.min(1, availH / targetH, availW / targetW);
-  const shouldScale = scale < 0.98;
+  const targetH = 290;
+  const targetW = 740;
+  const landscapeScale = Math.min(1, availH / targetH, availW / targetW);
+  const shouldScaleLandscape = isLandscapeMobile && landscapeScale < 0.98;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-xs p-1 select-none overflow-hidden">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-xs select-none ${
+        isPortrait ? 'p-0 overflow-y-auto' : 'p-1 overflow-hidden'
+      }`}
+    >
       <div
         style={{
-          transform: shouldScale ? `scale(${scale})` : undefined,
+          transform: shouldScaleLandscape ? `scale(${landscapeScale})` : undefined,
           transformOrigin: 'center center',
         }}
-        className={`relative bg-[#151426] border-4 ${theme.borderClass} ${theme.pixelBoxClass} p-2 sm:p-4 max-w-2xl lg:max-w-3xl xl:max-w-4xl w-full shadow-2xl flex flex-col gap-2 ${
-          shouldScale || isLandscapeMobile ? 'overflow-hidden' : 'max-h-[96dvh] overflow-y-auto'
-        }`}
+        className={`relative bg-[#151426] ${
+          isPortrait
+            ? `w-full h-full min-h-[100dvh] max-h-[100dvh] border-0 sm:border-4 ${theme.borderClass} ${theme.pixelBoxClass} p-2.5 sm:p-4 overflow-y-auto`
+            : isLandscapeMobile
+            ? `border-4 ${theme.borderClass} ${theme.pixelBoxClass} p-2 max-w-4xl w-full shadow-2xl overflow-hidden`
+            : `border-4 ${theme.borderClass} ${theme.pixelBoxClass} p-4 max-w-2xl lg:max-w-3xl w-full shadow-2xl max-h-[96dvh] overflow-y-auto my-auto`
+        } flex flex-col gap-2`}
       >
         {/* Header */}
         <div className="flex justify-between items-center pb-1.5 border-b-2 border-slate-700/80">

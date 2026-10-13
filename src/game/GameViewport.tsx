@@ -849,35 +849,57 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
                 const tableSprite = getTableSprite(room.id, deco.width || 2, deco.height || 1.5);
                 ctx.drawImage(tableSprite, decoX, decoY, w, h);
 
-                // Draw exhibited collectibles on tabletop
+                // Draw exhibited collectibles on tabletop with solid, opaque pedestals (no transparent hologram effect)
                 const displayed = (displayedItems && deco.id && displayedItems[deco.id]) || [];
                 if (displayed && displayed.length > 0) {
                   // Slot 1 (Left)
                   if (displayed[0]) {
                     const item1 = JAPANESE_DICTIONARY[displayed[0]] || { icon: '✨' };
-                    ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
-                    ctx.beginPath();
-                    ctx.ellipse(decoX + 8, decoY + 5, 5, 2, 0, 0, Math.PI * 2);
-                    ctx.fill();
                     ctx.save();
-                    ctx.font = '11px serif';
+                    // Soft shadow
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.beginPath();
+                    ctx.ellipse(decoX + 8, decoY + 6, 6, 2.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Solid dark velvet display coaster with gold rim (blocks wood bleed-through)
+                    ctx.fillStyle = '#1e1b4b';
+                    ctx.strokeStyle = '#facc15';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.ellipse(decoX + 8, decoY + 4, 5, 2.2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    // 100% solid opaque artifact icon
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 11px serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(item1.icon, decoX + 8, decoY + 3);
+                    ctx.fillText(item1.icon, decoX + 8, decoY + 2.5);
                     ctx.restore();
                   }
                   // Slot 2 (Right)
                   if (displayed[1]) {
                     const item2 = JAPANESE_DICTIONARY[displayed[1]] || { icon: '✨' };
-                    ctx.fillStyle = 'rgba(250, 204, 21, 0.4)';
-                    ctx.beginPath();
-                    ctx.ellipse(decoX + w - 8, decoY + 5, 5, 2, 0, 0, Math.PI * 2);
-                    ctx.fill();
                     ctx.save();
-                    ctx.font = '11px serif';
+                    // Soft shadow
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+                    ctx.beginPath();
+                    ctx.ellipse(decoX + w - 8, decoY + 6, 6, 2.5, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Solid dark velvet display coaster with gold rim
+                    ctx.fillStyle = '#1e1b4b';
+                    ctx.strokeStyle = '#facc15';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.ellipse(decoX + w - 8, decoY + 4, 5, 2.2, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                    // 100% solid opaque artifact icon
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 11px serif';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(item2.icon, decoX + w - 8, decoY + 3);
+                    ctx.fillText(item2.icon, decoX + w - 8, decoY + 2.5);
                     ctx.restore();
                   }
                 }

@@ -147,7 +147,7 @@ export const GameRockPaperScissors: React.FC<GameRockPaperScissorsProps> = ({
     setAiChoice(null);
     setTimeLeft(2.8);
     setPumpBeat(0);
-    setRoundResult('JAN... KEN... Select/change your move before timer ends!');
+    setRoundResult('JAN... KEN... Select your move!');
 
     let currentBeat = 0;
     sounds.playBlip(480);
@@ -407,8 +407,8 @@ export const GameRockPaperScissors: React.FC<GameRockPaperScissorsProps> = ({
           </div>
         </div>
 
-        {/* Round Feedback Status */}
-        <div className="text-xs sm:text-sm text-yellow-300 font-bold mb-4 text-center h-5 tracking-wider">
+        {/* Round Feedback Status - flexible height prevents button collision */}
+        <div className="text-xs sm:text-sm text-yellow-300 font-bold mb-2 sm:mb-3 text-center min-h-[30px] flex items-center justify-center tracking-wider px-2">
           {roundResult}
         </div>
 

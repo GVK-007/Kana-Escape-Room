@@ -15,6 +15,8 @@ export interface DeviceModeInfo {
   canvasWidth: number;
   canvasHeight: number;
   scale: number;
+  zoomMultiplier: number;
+  setZoomMultiplier: (val: number) => void;
   preference: AspectPreference;
   setPreference: (pref: AspectPreference) => void;
   togglePreference: () => void;
@@ -22,6 +24,7 @@ export interface DeviceModeInfo {
 }
 
 const STORAGE_KEY = 'kana_aspect_preference';
+const ZOOM_STORAGE_KEY = 'kana_camera_zoom_mult';
 
 export function useDeviceMode(): DeviceModeInfo {
   const [preference, setPreferenceState] = useState<AspectPreference>(() => {
@@ -97,6 +100,29 @@ export function useDeviceMode(): DeviceModeInfo {
     }
   }, [isPortrait]);
 
+  const [zoomMultiplier, setZoomMultiplierState] = useState<number>(() => {
+    if (typeof window === 'undefined') return 1.0;
+    try {
+      const stored = localStorage.getItem(ZOOM_STORAGE_KEY);
+      if (stored) {
+        const val = parseFloat(stored);
+        if (!isNaN(val) && val >= 0.7 && val <= 1.4) return val;
+      }
+    } catch {
+      // ignore
+    }
+    return 1.0;
+  });
+
+  const setZoomMultiplier = useCallback((val: number) => {
+    setZoomMultiplierState(val);
+    try {
+      localStorage.setItem(ZOOM_STORAGE_KEY, val.toString());
+    } catch {
+      // ignore
+    }
+  }, []);
+
   // Auto detection
   const detectedIsMobile = width < 768 || (isTouch && width < 900 && coarsePointer);
   const detectedIsTablet = !detectedIsMobile && (width < 1024 || (isTouch && coarsePointer));
@@ -123,43 +149,45 @@ export function useDeviceMode(): DeviceModeInfo {
   let aspectRatio: AspectRatioMode = '16:9';
   let canvasWidth = 960;
   let canvasHeight = 540;
-  let scale = 2.65;
+  let baseScale = 2.65;
 
   if (isPortrait || (isMobile && !isDesktop && isPortrait)) {
     if (portraitRatio === '1:1') {
       aspectRatio = '1:1';
       canvasWidth = 360;
       canvasHeight = 360;
-      scale = 3.8;
+      baseScale = 2.85; // Default zoomed-out by a bit from 3.8 to 2.85
     } else {
       aspectRatio = '3:2';
       canvasWidth = 360;
       canvasHeight = 240;
-      scale = 3.8;
+      baseScale = 2.85; // Default zoomed-out by a bit from 3.8 to 2.85
     }
   } else if (isMobile) {
     aspectRatio = landscapeRatio;
     if (landscapeRatio === '3:2') {
       canvasWidth = 675;
       canvasHeight = 450;
-      scale = 2.4;
+      baseScale = 2.4;
     } else {
       canvasWidth = 800;
       canvasHeight = 450;
-      scale = 2.4;
+      baseScale = 2.4;
     }
   } else if (isTablet) {
     aspectRatio = landscapeRatio;
     canvasWidth = 896;
     canvasHeight = 504;
-    scale = 2.55;
+    baseScale = 2.55;
   } else {
     // Desktop PC: expansive 16:9 widescreen canvas
     aspectRatio = landscapeRatio;
     canvasWidth = 960;
     canvasHeight = 540;
-    scale = 2.65;
+    baseScale = 2.65;
   }
+
+  const scale = Number((baseScale * zoomMultiplier).toFixed(2));
 
   return {
     deviceType,
@@ -172,6 +200,8 @@ export function useDeviceMode(): DeviceModeInfo {
     canvasWidth,
     canvasHeight,
     scale,
+    zoomMultiplier,
+    setZoomMultiplier,
     preference,
     setPreference,
     togglePreference,

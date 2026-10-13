@@ -624,6 +624,8 @@ export default function App() {
           onOpenInventory={() => setGameState('INVENTORY')}
           onQuitToTitle={() => setGameState('TITLE')}
           onSaveImported={handleSaveImported}
+          zoomMultiplier={device.zoomMultiplier}
+          onZoomChange={device.setZoomMultiplier}
         />
       )}
 
