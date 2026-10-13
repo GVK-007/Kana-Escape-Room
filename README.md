@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://kana-escape-room.ai.studio/"><img src="https://img.shields.io/badge/Live_App-kana--escape--room.ai.studio-10b981?style=flat-square" alt="Live Application" /></a>
+  <a href="https://kana-escape-room.pages.dev/"><img src="https://img.shields.io/badge/Live_App-kana--escape--room.pages.dev-10b981?style=flat-square" alt="Live Application" /></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL_v3-blue.svg?style=flat-square" alt="License: GPL v3" /></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-19-61dafb?style=flat-square&logo=react&logoColor=black" alt="React" /></a>
   <a href="https://www.typescriptlang.org/"><img src="https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white" alt="TypeScript" /></a>
@@ -22,7 +22,7 @@
 ## Live Deployment
 
 The game is deployed and playable in any modern desktop or mobile web browser:
-**[https://kana-escape-room.ai.studio/](https://kana-escape-room.ai.studio/)**
+**[https://kana-escape-room.pages.dev/](https://kana-escape-room.pages.dev/)**
 
 ---
 
