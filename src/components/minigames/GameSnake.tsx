@@ -233,7 +233,7 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
             className="absolute inset-0 bg-black/45 flex flex-col items-center justify-center p-2 z-10 cursor-pointer animate-pulse"
           >
             <span className="font-pixel text-[10px] sm:text-xs text-yellow-300 bg-slate-900/90 border border-yellow-400 px-3 py-1.5 shadow-lg tracking-wider text-center">
-              SWIPE OR USE D-PAD TO START
+              SWIPE OR ARROW KEYS TO START
             </span>
           </div>
         )}
@@ -264,36 +264,9 @@ export const GameSnake: React.FC<GameSnakeProps> = ({ onSuccess, targetFood = 10
         )}
       </div>
 
-      {/* D-Pad Buttons */}
-      <div className="mt-3 flex flex-col items-center gap-1.5">
-        <button
-          onClick={() => changeDirection('UP')}
-          className="w-14 h-9 sm:w-16 sm:h-10 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm font-bold cursor-pointer active:bg-slate-600 rounded"
-        >
-          ▲
-        </button>
-        <div className="flex gap-2">
-          <button
-            onClick={() => changeDirection('LEFT')}
-            className="w-14 h-9 sm:w-16 sm:h-10 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm font-bold cursor-pointer active:bg-slate-600 rounded"
-          >
-            ◀
-          </button>
-          <button
-            onClick={() => changeDirection('DOWN')}
-            className="w-14 h-9 sm:w-16 sm:h-10 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm font-bold cursor-pointer active:bg-slate-600 rounded"
-          >
-            ▼
-          </button>
-          <button
-            onClick={() => changeDirection('RIGHT')}
-            className="w-14 h-9 sm:w-16 sm:h-10 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm font-bold cursor-pointer active:bg-slate-600 rounded"
-          >
-            ▶
-          </button>
-        </div>
-      </div>
-      <p className="text-[10px] sm:text-xs text-slate-400 mt-2">Arrow Keys / WASD or D-Pad</p>
+      <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
+        Swipe to Slither • Arrow Keys / WASD
+      </p>
     </div>
   );
 };

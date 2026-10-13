@@ -318,16 +318,9 @@ export const GameFlappy: React.FC<GameFlappyProps> = ({ onSuccess, targetScore =
         )}
       </div>
 
-      <button
-        onPointerDown={(e) => {
-          e.preventDefault();
-          jump();
-        }}
-        className="mt-2.5 px-6 py-2 sm:py-2.5 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs sm:text-sm md:text-base border-2 border-yellow-200 cursor-pointer active:translate-y-0.5 shadow-md w-full max-w-[320px] text-center"
-      >
-        LIFT DRONE [SPACE]
-      </button>
-      <p className="text-[9px] sm:text-[10px] md:text-xs text-slate-400 mt-1">Space, Up Arrow, or Tap to Hover</p>
+      <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
+        Tap screen, [Space], or Up Arrow to Fly
+      </p>
     </div>
   );
 };

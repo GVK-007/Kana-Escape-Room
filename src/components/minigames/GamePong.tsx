@@ -327,30 +327,8 @@ export const GamePong: React.FC<GamePongProps> = ({ onSuccess, targetPoints = 3 
         )}
       </div>
 
-      {/* Touch Controls */}
-      <div className="flex gap-4 mt-3">
-        <button
-          onMouseDown={() => { stateRef.current.keys.up = true; }}
-          onMouseUp={() => { stateRef.current.keys.up = false; }}
-          onTouchStart={() => { stateRef.current.keys.up = true; }}
-          onTouchEnd={() => { stateRef.current.keys.up = false; }}
-          className="px-7 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer"
-        >
-          ▲ UP
-        </button>
-        <button
-          onMouseDown={() => { stateRef.current.keys.down = true; }}
-          onMouseUp={() => { stateRef.current.keys.down = false; }}
-          onTouchStart={() => { stateRef.current.keys.down = true; }}
-          onTouchEnd={() => { stateRef.current.keys.down = false; }}
-          className="px-7 py-2.5 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer"
-        >
-          ▼ DOWN
-        </button>
-      </div>
-
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        W/S or Up/Down • Slice with the paddle edges to drive fast, angled shots!
+        Drag Paddle or use [W/S] / Arrow Keys
       </p>
     </div>
   );

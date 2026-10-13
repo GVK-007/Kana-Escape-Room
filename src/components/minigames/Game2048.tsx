@@ -495,37 +495,8 @@ export const Game2048: React.FC<Game2048Props> = ({ onSuccess }) => {
         </span>
       </div>
 
-      {/* D-Pad Buttons */}
-      <div className="grid grid-cols-3 gap-2 mt-3.5 w-52 sm:w-60">
-        <div />
-        <button
-          onClick={() => move('up')}
-          className="h-11 sm:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border-2 border-slate-600 text-base font-bold cursor-pointer flex items-center justify-center rounded active:scale-95 transition-transform"
-        >
-          ▲
-        </button>
-        <div />
-        <button
-          onClick={() => move('left')}
-          className="h-11 sm:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border-2 border-slate-600 text-base font-bold cursor-pointer flex items-center justify-center rounded active:scale-95 transition-transform"
-        >
-          ◀
-        </button>
-        <button
-          onClick={() => move('down')}
-          className="h-11 sm:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border-2 border-slate-600 text-base font-bold cursor-pointer flex items-center justify-center rounded active:scale-95 transition-transform"
-        >
-          ▼
-        </button>
-        <button
-          onClick={() => move('right')}
-          className="h-11 sm:h-12 bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 border-2 border-slate-600 text-base font-bold cursor-pointer flex items-center justify-center rounded active:scale-95 transition-transform"
-        >
-          ▶
-        </button>
-      </div>
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        Arrow Keys [W/A/S/D] or D-Pad • Reach 256!
+        Swipe Grid or Arrow Keys [WASD] • Reach 256!
       </p>
     </div>
   );

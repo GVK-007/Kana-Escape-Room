@@ -509,33 +509,8 @@ export const GameWallBreaker: React.FC<GameWallBreakerProps> = ({ onSuccess }) =
         )}
       </div>
 
-      <div className="flex gap-4 mt-3 w-full justify-center">
-        <button
-          onClick={() => { stateRef.current.paddleX = Math.max(4, stateRef.current.paddleX - 25); }}
-          className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer active:bg-slate-600"
-        >
-          ◀ LEFT
-        </button>
-        <button
-          onClick={() => { stateRef.current.started = true; }}
-          className="px-6 py-2 bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs sm:text-sm border-2 border-white cursor-pointer active:translate-y-0.5"
-        >
-          LAUNCH [SPACE]
-        </button>
-        <button
-          onClick={() => {
-            stateRef.current.paddleX = Math.min(
-              260 - stateRef.current.paddleW - 4,
-              stateRef.current.paddleX + 25
-            );
-          }}
-          className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer active:bg-slate-600"
-        >
-          RIGHT ▶
-        </button>
-      </div>
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        Powerups: <span className="text-emerald-400 font-bold">[M] Multi-Ball</span> • <span className="text-sky-400 font-bold">[W] Wide Paddle</span> • <span className="text-yellow-400 font-bold">[S] Slow Speed</span>
+        Drag Paddle or use [A/D] / Arrow Keys • Tap to Launch
       </p>
     </div>
   );

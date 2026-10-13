@@ -226,11 +226,19 @@ export const GameKanaCatcher: React.FC<GameKanaCatcherProps> = ({ onSuccess, tar
               stateRef.current.basketX = Math.max(8, Math.min(200, x - 27));
             }
           }}
-          onTouchMove={(e) => {
-            if (e.touches[0] && canvasRef.current) {
+          onPointerDown={(e) => {
+            if (canvasRef.current) {
               const rect = canvasRef.current.getBoundingClientRect();
               const scaleX = canvasRef.current.width / rect.width;
-              const x = (e.touches[0].clientX - rect.left) * scaleX;
+              const x = (e.clientX - rect.left) * scaleX;
+              stateRef.current.basketX = Math.max(8, Math.min(200, x - 27));
+            }
+          }}
+          onPointerMove={(e) => {
+            if (e.buttons === 1 && canvasRef.current) {
+              const rect = canvasRef.current.getBoundingClientRect();
+              const scaleX = canvasRef.current.width / rect.width;
+              const x = (e.clientX - rect.left) * scaleX;
               stateRef.current.basketX = Math.max(8, Math.min(200, x - 27));
             }
           }}
@@ -263,22 +271,8 @@ export const GameKanaCatcher: React.FC<GameKanaCatcherProps> = ({ onSuccess, tar
         )}
       </div>
 
-      <div className="flex gap-4 mt-3 w-full justify-center">
-        <button
-          onClick={() => { stateRef.current.basketX = Math.max(8, stateRef.current.basketX - 26); }}
-          className="px-7 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer active:bg-slate-600"
-        >
-          ◀ LEFT
-        </button>
-        <button
-          onClick={() => { stateRef.current.basketX = Math.min(200, stateRef.current.basketX + 26); }}
-          className="px-7 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer active:bg-slate-600"
-        >
-          RIGHT ▶
-        </button>
-      </div>
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        Catch 15 falling spirits in the basin • Every single spirit must be caught!
+        Drag Basin or use [A/D] / Arrow Keys • Catch all 15 spirits
       </p>
     </div>
   );

@@ -352,28 +352,8 @@ export const GameLaneRunner: React.FC<GameLaneRunnerProps> = ({ onSuccess, targe
         )}
       </div>
 
-      <div className="flex gap-4 mt-3 w-full justify-center">
-        <button
-          onPointerDown={(e) => {
-            e.preventDefault();
-            changeLane(-1);
-          }}
-          className="px-7 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer active:bg-slate-600"
-        >
-          ◀ LEFT LANE
-        </button>
-        <button
-          onPointerDown={(e) => {
-            e.preventDefault();
-            changeLane(1);
-          }}
-          className="px-7 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border-2 border-slate-600 text-xs sm:text-sm cursor-pointer active:bg-slate-600"
-        >
-          RIGHT LANE ▶
-        </button>
-      </div>
       <p className="text-[10px] sm:text-xs text-slate-400 mt-2 text-center">
-        Swipe Left/Right, Tap Screen Sides, or use Buttons to steer!
+        Swipe Left/Right, Tap Screen Sides, or [A/D] / Arrow Keys
       </p>
     </div>
   );
