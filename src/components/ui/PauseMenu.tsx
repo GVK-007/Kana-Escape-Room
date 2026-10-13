@@ -11,8 +11,6 @@ interface PauseMenuProps {
   onOpenInventory: () => void;
   onQuitToTitle: () => void;
   onSaveImported?: (data: GameSaveState) => void;
-  zoomMultiplier?: number;
-  onZoomChange?: (val: number) => void;
 }
 
 export const PauseMenu: React.FC<PauseMenuProps> = ({
@@ -22,8 +20,6 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
   onOpenInventory,
   onQuitToTitle,
   onSaveImported,
-  zoomMultiplier,
-  onZoomChange,
 }) => {
   const [showControls, setShowControls] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
@@ -219,43 +215,6 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({
             >
               <span>AMBIENT & SOUND 🔊</span>
             </button>
-
-            {/* Camera Zoom Preference Slider */}
-            {onZoomChange && (
-              <div className="w-full bg-slate-950 p-2.5 border-2 border-slate-700 rounded text-left flex flex-col gap-1.5 shadow-inner">
-                <div className="flex justify-between items-center text-[10px] font-pixel text-yellow-300">
-                  <span className="flex items-center gap-1">
-                    <span>🔍</span>
-                    <span>CAMERA ZOOM</span>
-                  </span>
-                  <span className="font-mono text-cyan-300 font-bold">
-                    {Math.round((zoomMultiplier || 1.0) * 100)}%
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 py-0.5">
-                  <span className="text-[8px] font-pixel text-slate-400">WIDE</span>
-                  <input
-                    type="range"
-                    min="75"
-                    max="135"
-                    step="5"
-                    value={Math.round((zoomMultiplier || 1.0) * 100)}
-                    onChange={(e) => onZoomChange(Number(e.target.value) / 100)}
-                    className="w-full accent-yellow-400 cursor-pointer h-1.5 bg-slate-800 rounded-lg"
-                  />
-                  <span className="text-[8px] font-pixel text-slate-400">CLOSE</span>
-                </div>
-                <div className="flex justify-between items-center text-[8px] font-pixel text-slate-500">
-                  <button
-                    onClick={() => onZoomChange(1.0)}
-                    className="text-amber-400 hover:text-amber-300 cursor-pointer"
-                  >
-                    [RESET DEFAULT]
-                  </button>
-                  <span>100% = Balanced View</span>
-                </div>
-              </div>
-            )}
 
             <button
               onClick={() => {

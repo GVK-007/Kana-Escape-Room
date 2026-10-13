@@ -720,8 +720,18 @@ const GameViewportComponent: React.FC<GameViewportProps> = ({
       ctx.fillRect(0, 0, canvas.width, canvas.height);
 
       ctx.save();
-      // Center camera on player with widescreen room boundary centering
-      const currentScale = device.scale || DEFAULT_SCALE;
+      // Center camera on player with room-specific scale (Room 1: 2.85 perfect; Room 2: 2.35; Room 3: 2.10)
+      const isPortrait = device.orientation === 'portrait';
+      let currentScale = device.scale || DEFAULT_SCALE;
+      if (isPortrait) {
+        if (room.id === 'room-3') {
+          currentScale = 2.10;
+        } else if (room.id === 'room-2') {
+          currentScale = 2.35;
+        } else {
+          currentScale = 2.85;
+        }
+      }
       const viewW = canvas.width / currentScale;
       const viewH = canvas.height / currentScale;
 
